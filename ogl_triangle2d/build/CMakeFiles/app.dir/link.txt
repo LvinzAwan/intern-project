@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/app.dir/src/app/main.cpp.o CMakeFiles/app.dir/src/app/TriangleApp.cpp.o -o app  libcore.a /usr/lib/x86_64-linux-gnu/libglfw.so.3.3 /usr/lib/x86_64-linux-gnu/libGLX.so /usr/lib/x86_64-linux-gnu/libOpenGL.so /usr/lib/x86_64-linux-gnu/libGLEW.so 

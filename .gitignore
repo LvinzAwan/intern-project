@@ -1,0 +1,12 @@
+# Ignore build directories
+**/build/
+**/_deps/
+**/CMakeCache.txt
+**/CMakeFiles/
+**/Makefile
+**/*.o
+**/*.so
+**/*.a
+**/*.exe
+**/Testing/
+**/CTestTestfile.cmake

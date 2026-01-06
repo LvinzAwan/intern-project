@@ -1,4 +1,0 @@
-/home/lvinz/magang/ogl_triangle/build/CMakeFiles/core.dir
-/home/lvinz/magang/ogl_triangle/build/CMakeFiles/app.dir
-/home/lvinz/magang/ogl_triangle/build/CMakeFiles/edit_cache.dir
-/home/lvinz/magang/ogl_triangle/build/CMakeFiles/rebuild_cache.dir
