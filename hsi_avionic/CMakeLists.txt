@@ -26,7 +26,6 @@ add_executable(hsi_avionic
   src/main.cpp
   src/Shader.cpp
   src/CompasRenderer.cpp
-  src/TextRenderer.cpp
   src/TtfTextRenderer.cpp
 )
 

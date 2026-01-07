@@ -9,6 +9,14 @@ public:
                    float r, float g, float b);
   void drawTextCenteredNDC(const std::string& text, float cx_ndc, float cy_ndc,
                          float r, float g, float b);
+  void drawTextCenteredNDCRotated(const char* text, 
+                                   float x, float y, 
+                                   float rotation_deg,
+                                   float r, float g, float b);
+  void drawTextLeftAligned(const char* text, float x, float y, 
+                          float r, float g, float b);
+  void drawTextRightAligned(const char* text, float x, float y, 
+                           float r, float g, float b);
 
 
 private:

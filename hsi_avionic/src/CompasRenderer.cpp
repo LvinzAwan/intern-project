@@ -4,26 +4,6 @@
 
 static float deg2rad(float d) { return d * 3.1415926535f / 180.0f; }
 
-static void cardToNDC(float deg_on_card,
-                      float radius,
-                      float heading_deg,
-                      float aspect_fix,
-                      float& out_x,
-                      float& out_y) {
-  // 1) card berputar kebalikan heading
-  float a = deg2rad(deg_on_card - heading_deg);
-
-  // 2) titik lingkaran (tanpa aspect dulu)
-  float x = std::cos(a) * radius;
-  float y = std::sin(a) * radius;
-
-  // 3) baru apply aspect
-  x *= aspect_fix;
-
-  out_x = x;
-  out_y = y;
-}
-
 bool CompasRenderer::init(int width, int height) {
   width_ = width;
   height_ = height;
@@ -46,29 +26,22 @@ bool CompasRenderer::init(int width, int height) {
   glGenVertexArrays(1, &vao_);
   glGenBuffers(1, &vbo_);
 
-  // Ring dulu: radius 0.70 NDC, 200 segmen biar halus
   buildRingGeometry(0.70f, 200);
-//   buildTicksGeometry(
-//     0.70f,  // sama dengan radius ring
-//     0.12f,  // major (tiap 30°) lebih panjang
-//     0.08f,  // medium (tiap 10°)
-//     0.05f   // minor (tiap 5°)
-//   );
 
   tick_outer_r_ = 0.70f;
-  tick_inner_r_30_ = 0.12f;
-  tick_inner_r_10_ = 0.08f;
-  tick_inner_r_5_  = 0.05f;
-  rebuildTicks();
+  tick_inner_r_90_ = 0.10f;
+  tick_inner_r_30_ = 0.07f;
+  tick_inner_r_10_ = 0.05f;
+  tick_inner_r_5_  = 0.03f;
   
+  buildTicksGeometry(tick_outer_r_, tick_inner_r_90_, tick_inner_r_30_, tick_inner_r_10_, tick_inner_r_5_);
   buildCardinalMarkersGeometry(0.70f, 0.06f);
+  buildHeadingIndicatorGeometry();
 
   return true;
 }
 
 void CompasRenderer::buildRingGeometry(float radius_ndc, int segments) {
-  // Biar lingkaran nggak jadi oval di 800x600, kita koreksi aspect:
-  // x dikali (height/width)
   float aspect_fix = (float)height_ / (float)width_;
 
   std::vector<float> verts;
@@ -99,14 +72,21 @@ void CompasRenderer::buildRingGeometry(float radius_ndc, int segments) {
 }
 
 void CompasRenderer::buildTicksGeometry(float radius_ndc,
-                                        float len_major, float len_medium, float len_minor) {
+                                        float len_cardinal,
+                                        float len_major, 
+                                        float len_medium, 
+                                        float len_minor) {
   float aspect_fix = (float)height_ / (float)width_;
 
-  std::vector<float> v_major, v_medium, v_minor;
-  v_major.reserve(360); v_medium.reserve(720); v_minor.reserve(1440);
+  std::vector<float> v_cardinal, v_major, v_medium, v_minor;
+  v_cardinal.reserve(240);
+  v_major.reserve(360); 
+  v_medium.reserve(720); 
+  v_minor.reserve(1440);
 
   auto push_tick = [&](std::vector<float>& v, int deg, float len) {
-    float a = (deg - heading_deg_)  * 3.1415926535f / 180.0f;
+    float angle = deg - heading_deg_;
+    float a = angle * 3.1415926535f / 180.0f;
 
     float x0 = std::cos(a) * radius_ndc * aspect_fix;
     float y0 = std::sin(a) * radius_ndc;
@@ -119,7 +99,9 @@ void CompasRenderer::buildTicksGeometry(float radius_ndc,
   };
 
   for (int deg = 0; deg < 360; ++deg) {
-    if (deg % 30 == 0) {
+    if (deg % 90 == 0) {
+      push_tick(v_cardinal, deg, len_cardinal);
+    } else if (deg % 30 == 0) {
       push_tick(v_major, deg, len_major);
     } else if (deg % 10 == 0) {
       push_tick(v_medium, deg, len_medium);
@@ -128,17 +110,21 @@ void CompasRenderer::buildTicksGeometry(float radius_ndc,
     }
   }
 
+  cardinal_count_ = (int)(v_cardinal.size() / 2);
   major_count_  = (int)(v_major.size() / 2);
   medium_count_ = (int)(v_medium.size() / 2);
   minor_count_  = (int)(v_minor.size() / 2);
 
   auto upload = [](GLuint& vao, GLuint& vbo, const std::vector<float>& v) {
+    if (vao != 0) glDeleteBuffers(1, &vbo);
+    if (vao != 0) glDeleteVertexArrays(1, &vao);
+    
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(v.size() * sizeof(float)), v.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(v.size() * sizeof(float)), v.data(), GL_DYNAMIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -147,6 +133,7 @@ void CompasRenderer::buildTicksGeometry(float radius_ndc,
     glBindVertexArray(0);
   };
 
+  upload(cardinal_vao_, cardinal_vbo_, v_cardinal);
   upload(major_vao_, major_vbo_, v_major);
   upload(medium_vao_, medium_vbo_, v_medium);
   upload(minor_vao_, minor_vbo_, v_minor);
@@ -155,28 +142,27 @@ void CompasRenderer::buildTicksGeometry(float radius_ndc,
 void CompasRenderer::buildCardinalMarkersGeometry(float radius_ndc, float size_ndc) {
   float aspect_fix = (float)height_ / (float)width_;
 
-  // 4 segitiga, masing-masing 3 vertex, tiap vertex 2 float
   std::vector<float> verts;
   verts.reserve(4 * 3 * 2);
 
-  auto add_triangle_inward = [&](float nx, float ny) {
-    // (nx, ny) itu arah unit (contoh north = (0,1))
-    // Pusat segitiga kita taruh di ring
-    float cx = nx * radius_ndc * aspect_fix;
-    float cy = ny * radius_ndc;
+  auto add_triangle_inward = [&](float bearing_deg) {
+    float angle = bearing_deg - heading_deg_;
+    float a = angle * 3.1415926535f / 180.0f;
+    
+    float cos_a = std::cos(a);
+    float sin_a = std::sin(a);
 
-    // arah ke dalam = -n
-    float inx = -nx;
-    float iny = -ny;
+    float cx = cos_a * radius_ndc * aspect_fix;
+    float cy = sin_a * radius_ndc;
 
-    // v0: ujung segitiga mengarah ke dalam (tip)
+    float inx = -cos_a;
+    float iny = -sin_a;
+
     float x0 = cx + inx * size_ndc * aspect_fix;
     float y0 = cy + iny * size_ndc;
 
-    // v1 & v2: basis segitiga (pakai vektor tangensial)
-    // t = (-ny, nx)
-    float tx = -ny;
-    float ty = nx;
+    float tx = -sin_a;
+    float ty = cos_a;
 
     float half = size_ndc * 0.6f;
 
@@ -189,24 +175,71 @@ void CompasRenderer::buildCardinalMarkersGeometry(float radius_ndc, float size_n
     verts.insert(verts.end(), {x0, y0, x1, y1, x2, y2});
   };
 
-  // North, East, South, West
-  add_triangle_inward(0.0f, 1.0f);   // 0° (atas)
-  add_triangle_inward(1.0f, 0.0f);   // 90° (kanan)
-  add_triangle_inward(0.0f, -1.0f);  // 180° (bawah)
-  add_triangle_inward(-1.0f, 0.0f);  // 270° (kiri)
+  add_triangle_inward(0.0f);    // N
+  add_triangle_inward(90.0f);   // E
+  add_triangle_inward(180.0f);  // S
+  add_triangle_inward(270.0f);  // W
 
   markers_vertex_count_ = (int)(verts.size() / 2);
+
+  if (markers_vao_ != 0) glDeleteBuffers(1, &markers_vbo_);
+  if (markers_vao_ != 0) glDeleteVertexArrays(1, &markers_vao_);
 
   glGenVertexArrays(1, &markers_vao_);
   glGenBuffers(1, &markers_vbo_);
 
   glBindVertexArray(markers_vao_);
   glBindBuffer(GL_ARRAY_BUFFER, markers_vbo_);
-  glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size() * sizeof(float)), verts.data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size() * sizeof(float)), verts.data(), GL_DYNAMIC_DRAW);
 
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
   glEnableVertexAttribArray(0);
 
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+}
+
+void CompasRenderer::buildHeadingIndicatorGeometry() {
+  float aspect_fix = (float)height_ / (float)width_;
+  
+  std::vector<float> verts;
+  
+  // Parameter untuk penanda heading
+  float indicator_y = 0.77f;  // Posisi Y
+  float arrow_height = 0.12f;  // Tinggi panah
+  float arrow_width = 0.06f;   // Lebar panah
+  
+  // Segitiga pointing down (panah utama)
+  float x_center = 0.0f;
+  float x_left = -arrow_width * aspect_fix;
+  float x_right = arrow_width * aspect_fix;
+  
+  float y_top = indicator_y;
+  float y_bottom = indicator_y - arrow_height;
+  
+  // Vertex segitiga
+  verts.push_back(x_center);
+  verts.push_back(y_bottom);
+  verts.push_back(x_left);
+  verts.push_back(y_top);
+  verts.push_back(x_right);
+  verts.push_back(y_top);
+  
+  heading_indicator_vertex_count_ = 3;
+  
+  if (heading_indicator_vao_ != 0) glDeleteBuffers(1, &heading_indicator_vbo_);
+  if (heading_indicator_vao_ != 0) glDeleteVertexArrays(1, &heading_indicator_vao_);
+  
+  glGenVertexArrays(1, &heading_indicator_vao_);
+  glGenBuffers(1, &heading_indicator_vbo_);
+  
+  glBindVertexArray(heading_indicator_vao_);
+  glBindBuffer(GL_ARRAY_BUFFER, heading_indicator_vbo_);
+  glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size() * sizeof(float)), verts.data(), GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+  
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 }
@@ -225,31 +258,35 @@ void CompasRenderer::drawRing() {
 }
 
 void CompasRenderer::drawTicks() {
+  buildTicksGeometry(tick_outer_r_, tick_inner_r_90_, tick_inner_r_30_, tick_inner_r_10_, tick_inner_r_5_);
+
   shader_.use();
 
   GLint loc = glGetUniformLocation(shader_.id(), "uColor");
   glUniform3f(loc, 1.0f, 1.0f, 1.0f);
-//   rebuildTicks();
 
-  // Major: 30°
+  glBindVertexArray(cardinal_vao_);
+  glLineWidth(5.0f);
+  glDrawArrays(GL_LINES, 0, cardinal_count_);
+
   glBindVertexArray(major_vao_);
-  glLineWidth(4.0f);
+  glLineWidth(3.5f);
   glDrawArrays(GL_LINES, 0, major_count_);
 
-  // Medium: 10°
   glBindVertexArray(medium_vao_);
-  glLineWidth(2.5f);
+  glLineWidth(2.0f);
   glDrawArrays(GL_LINES, 0, medium_count_);
 
-  // Minor: 5°
   glBindVertexArray(minor_vao_);
-  glLineWidth(1.5f);
+  glLineWidth(1.0f);
   glDrawArrays(GL_LINES, 0, minor_count_);
 
   glBindVertexArray(0);
 }
 
 void CompasRenderer::drawCardinalMarkers() {
+  buildCardinalMarkersGeometry(0.70f, 0.06f);
+
   shader_.use();
   glBindVertexArray(markers_vao_);
 
@@ -261,8 +298,16 @@ void CompasRenderer::drawCardinalMarkers() {
   glBindVertexArray(0);
 }
 
-void CompasRenderer::rebuildTicks() {
-  buildTicksGeometry(tick_outer_r_, tick_inner_r_30_, tick_inner_r_10_, tick_inner_r_5_);
+void CompasRenderer::drawHeadingIndicator() {
+  shader_.use();
+  glBindVertexArray(heading_indicator_vao_);
+
+  GLint loc = glGetUniformLocation(shader_.id(), "uColor");
+  glUniform3f(loc, 1.0f, 1.0f, 0.0f);  // Yellow
+
+  glDrawArrays(GL_TRIANGLES, 0, heading_indicator_vertex_count_);
+
+  glBindVertexArray(0);
 }
 
 

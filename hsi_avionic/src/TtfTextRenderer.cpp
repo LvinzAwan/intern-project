@@ -6,6 +6,7 @@
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include <cstring>  // Tambahkan ini untuk std::strlen
 
 // ---------------- shader helpers ----------------
 static GLuint compile(GLenum type, const char* src) {
@@ -265,5 +266,188 @@ void TtfTextRenderer::drawTextCenteredNDC(const std::string& text, float cx_ndc,
   float y_ndc = cy_ndc - h_ndc * 0.5f - (maxy * s);
 
   drawTextNDC(text, x_ndc, y_ndc, r, g, b);
+}
+
+void TtfTextRenderer::drawTextCenteredNDCRotated(const char* text,
+                                                  float cx_ndc, float cy_ndc,
+                                                  float rotation_deg,
+                                                  float r, float g, float b) {
+  if (!program_ || !tex_) return;
+
+  // Konversi rotasi ke radian
+  float angle_rad = rotation_deg * 3.14159265359f / 180.0f;
+  float cos_a = std::cos(angle_rad);
+  float sin_a = std::sin(angle_rad);
+
+  float s = 0.0020f; // Sama dengan skala di drawTextNDC
+
+  std::vector<float> verts;
+  verts.reserve(std::strlen(text) * 6 * 4);
+
+  // Hitung bounding box untuk centering
+  float x = 0.0f;
+  float minx =  1e9f, miny =  1e9f;
+  float maxx = -1e9f, maxy = -1e9f;
+
+  for (const char* c = text; *c; ++c) {
+    if (*c < 32 || *c > 127) continue;
+    const BakedChar& bc = chars_[*c - 32];
+
+    float gx0 = x + bc.xoff;
+    float gy0 = 0.0f - bc.yoff;
+    float gx1 = gx0 + (bc.x1 - bc.x0);
+    float gy1 = gy0 - (bc.y1 - bc.y0);
+
+    if (gx0 < minx) minx = gx0;
+    if (gy1 < miny) miny = gy1;
+    if (gx1 > maxx) maxx = gx1;
+    if (gy0 > maxy) maxy = gy0;
+
+    x += bc.xadvance;
+  }
+
+  if (minx > maxx) return; // string kosong
+
+  // Offset untuk centering (dalam font units)
+  float offset_x = -(minx + maxx) * 0.5f;
+  float offset_y = -(miny + maxy) * 0.5f;
+
+  // Render dengan rotasi
+  x = 0.0f;
+  for (const char* c = text; *c; ++c) {
+    if (*c < 32 || *c > 127) continue;
+    const BakedChar& bc = chars_[*c - 32];
+
+    // Posisi glyph dalam font units (dengan offset untuk centering)
+    float x0 = x + bc.xoff + offset_x;
+    float y0 = 0.0f - bc.yoff + offset_y;
+    float x1 = x0 + (bc.x1 - bc.x0);
+    float y1 = y0 - (bc.y1 - bc.y0);
+
+    // UV coordinates
+    float U0 = bc.x0 / (float)atlas_w_;
+    float V0 = bc.y0 / (float)atlas_h_;
+    float U1 = bc.x1 / (float)atlas_w_;
+    float V1 = bc.y1 / (float)atlas_h_;
+
+    // 4 corners (dalam font units, belum di-scale)
+    float corners[4][2] = {
+      { x0, y0 },  // top-left
+      { x1, y0 },  // top-right
+      { x1, y1 },  // bottom-right
+      { x0, y1 }   // bottom-left
+    };
+
+    // Rotasi dan scale setiap corner, lalu translate ke posisi akhir
+    float rotated[4][2];
+    for (int i = 0; i < 4; i++) {
+      float fx = corners[i][0] * s;
+      float fy = corners[i][1] * s;
+      
+      // Rotasi
+      float rx = fx * cos_a - fy * sin_a;
+      float ry = fx * sin_a + fy * cos_a;
+      
+      // Translate ke center
+      rotated[i][0] = rx + cx_ndc;
+      rotated[i][1] = ry + cy_ndc;
+    }
+
+    // Build triangles: (0,1,2) dan (0,2,3)
+    verts.insert(verts.end(), { 
+      rotated[0][0], rotated[0][1], U0, V0,
+      rotated[1][0], rotated[1][1], U1, V0,
+      rotated[2][0], rotated[2][1], U1, V1
+    });
+    verts.insert(verts.end(), { 
+      rotated[0][0], rotated[0][1], U0, V0,
+      rotated[2][0], rotated[2][1], U1, V1,
+      rotated[3][0], rotated[3][1], U0, V1
+    });
+
+    x += bc.xadvance;
+  }
+
+  // Render
+  glUseProgram(program_);
+  glUniform3f(uColor_, r, g, b);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, tex_);
+
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  glBindVertexArray(vao_);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+  glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size() * sizeof(float)), verts.data(), GL_DYNAMIC_DRAW);
+
+  glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(verts.size() / 4));
+
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+
+  glDisable(GL_BLEND);
+  glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void TtfTextRenderer::drawTextLeftAligned(const char* text, float x, float y, 
+                                         float r, float g, float b) {
+  if (!text || !program_ || !tex_) return;
+
+  // Hitung bounding box untuk mengetahui lebar text
+  float s = 0.0020f;
+  float x_pos = 0.0f;
+  float minx = 1e9f, maxx = -1e9f;
+
+  for (char c : std::string(text)) {
+    if (c < 32 || c > 127) continue;
+    const BakedChar& bc = chars_[c - 32];
+
+    float gx0 = x_pos + bc.xoff;
+    float gx1 = gx0 + (bc.x1 - bc.x0);
+
+    if (gx0 < minx) minx = gx0;
+    if (gx1 > maxx) maxx = gx1;
+
+    x_pos += bc.xadvance;
+  }
+
+  if (minx > maxx) return; // string kosong
+
+  // x adalah posisi kiri, jadi offset = minx * s
+  float x_ndc = x + (minx * s);
+  
+  drawTextNDC(text, x_ndc, y, r, g, b);
+}
+
+void TtfTextRenderer::drawTextRightAligned(const char* text, float x, float y, 
+                                          float r, float g, float b) {
+  if (!text || !program_ || !tex_) return;
+
+  // Hitung bounding box untuk mengetahui lebar text
+  float s = 0.0020f;
+  float x_pos = 0.0f;
+  float minx = 1e9f, maxx = -1e9f;
+
+  for (char c : std::string(text)) {
+    if (c < 32 || c > 127) continue;
+    const BakedChar& bc = chars_[c - 32];
+
+    float gx0 = x_pos + bc.xoff;
+    float gx1 = gx0 + (bc.x1 - bc.x0);
+
+    if (gx0 < minx) minx = gx0;
+    if (gx1 > maxx) maxx = gx1;
+
+    x_pos += bc.xadvance;
+  }
+
+  if (minx > maxx) return; // string kosong
+
+  // x adalah posisi kanan, jadi geser ke kiri sejauh (maxx * s)
+  float x_ndc = x - (maxx * s);
+  
+  drawTextNDC(text, x_ndc, y, r, g, b);
 }
 
