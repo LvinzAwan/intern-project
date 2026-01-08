@@ -98,245 +98,6 @@ struct WaypointGroup {
   TtfTextRenderer* info_font;
 };
 
-void drawBugTriangle(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
-  // Hitung posisi center segitiga dengan cara yang sama seperti drawTextAtBearingRadial
-  float rotated_bearing = bearing_deg + heading_deg;
-  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
-  
-  // Posisi center segitiga
-  float cx = std::sin(angle_rad) * radius;
-  float cy = std::cos(angle_rad) * radius;
-  cx *= aspect_fix;
-
-  // Hitung orientasi ujung lancip (pointing inward)
-  // Vektor inward pointing ke center (berlawanan dengan posisi)
-  float inx = -std::sin(angle_rad);
-  float iny = -std::cos(angle_rad);
-
-  // Ukuran segitiga
-  float tri_size = 0.10f;
-  
-  // Tip segitiga (pointing inward ke center)
-  float x0 = cx + inx * tri_size * aspect_fix;
-  float y0 = cy + iny * tri_size;
-
-  // Vektor tangent (perpendicular ke arah inward, diputar 90 derajat)
-  float tx = -iny;
-  float ty = inx;
-
-  float half = tri_size * 0.6f;
-
-  // Bottom left vertex
-  float x1 = cx + tx * half * aspect_fix;
-  float y1 = cy + ty * half;
-
-  // Bottom right vertex
-  float x2 = cx - tx * half * aspect_fix;
-  float y2 = cy - ty * half;
-
-  float vertices[] = {x0, y0, x1, y1, x2, y2};
-
-  GLuint VAO, VBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  
-  glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-  
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-  glEnableVertexAttribArray(0);
-
-  glLineWidth(5.0f);
-  glDrawArrays(GL_LINE_LOOP, 0, 3);
-  
-  glDeleteBuffers(1, &VBO);
-  glDeleteVertexArrays(1, &VAO);
-}
-
-// ARROW DOUBLE (untuk waypoint hijau/green)
-void drawWaypointArrowDouble(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
-  float rotated_bearing = bearing_deg + heading_deg;
-  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
-  
-  float start_radius = -0.50f;
-  float sx = std::sin(angle_rad) * start_radius;
-  float sy = std::cos(angle_rad) * start_radius;
-  sx *= aspect_fix;
-
-  float end_radius = radius;
-  float ex = std::sin(angle_rad) * end_radius;
-  float ey = std::cos(angle_rad) * end_radius;
-  ex *= aspect_fix;
-
-  float outx = std::sin(angle_rad);
-  float outy = std::cos(angle_rad);
-
-  float tx = outy;
-  float ty = -outx;
-
-  // Ukuran kepala panah
-  float arrow_head_length = 0.08f;
-  float arrow_head_width = 0.04f;
-
-  // Base kepala panah (mundur dari tip)
-  float base_x = ex - outx * arrow_head_length * aspect_fix;
-  float base_y = ey - outy * arrow_head_length;
-
-  // GARIS DOUBLE BERHENTI DI BASE (bukan di tip)
-  float line_offset = 0.015f;
-  
-  // Garis 1 (atas)
-  float sx1 = sx + tx * line_offset * aspect_fix;
-  float sy1 = sy + ty * line_offset;
-  float ex1 = base_x + tx * line_offset * aspect_fix;  // Berhenti di base
-  float ey1 = base_y + ty * line_offset;
-  
-  // Garis 2 (bawah)
-  float sx2 = sx - tx * line_offset * aspect_fix;
-  float sy2 = sy - ty * line_offset;
-  float ex2 = base_x - tx * line_offset * aspect_fix;  // Berhenti di base
-  float ey2 = base_y - ty * line_offset;
-
-  // Titik ujung panah
-  float tip_x = ex;
-  float tip_y = ey;
-
-  // Left wing
-  float left_x = base_x + tx * arrow_head_width * aspect_fix;
-  float left_y = base_y + ty * arrow_head_width;
-
-  // Right wing
-  float right_x = base_x - tx * arrow_head_width * aspect_fix;
-  float right_y = base_y - ty * arrow_head_width;
-
-  // Vertices: garis double (berhenti di base) + kepala panah
-  float vertices[] = {
-    // Garis double line 1 (atas) - dari start ke BASE
-    sx1, sy1,
-    ex1, ey1,
-    
-    // Garis double line 2 (bawah) - dari start ke BASE
-    sx2, sy2,
-    ex2, ey2,
-    
-    // Kepala panah: base -> left_wing
-    base_x, base_y,
-    left_x, left_y,
-    
-    // left_wing -> tip
-    left_x, left_y,
-    tip_x, tip_y,
-    
-    // tip -> right_wing
-    tip_x, tip_y,
-    right_x, right_y,
-    
-    // right_wing -> base
-    right_x, right_y,
-    base_x, base_y
-  };
-
-  GLuint VAO, VBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  
-  glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-  
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-  glEnableVertexAttribArray(0);
-
-  glLineWidth(3.5f);
-  glDrawArrays(GL_LINES, 0, 12);  // 12 vertices = 6 garis
-  
-  glDeleteBuffers(1, &VBO);
-  glDeleteVertexArrays(1, &VAO);
-}
-
-// ARROW SINGLE (untuk waypoint kuning/yellow)
-void drawWaypointArrowSingle(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
-  float rotated_bearing = bearing_deg + heading_deg;
-  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
-  
-  float start_radius = - 0.50f;
-  float sx = std::sin(angle_rad) * start_radius;
-  float sy = std::cos(angle_rad) * start_radius;
-  sx *= aspect_fix;
-
-  float end_radius = radius;
-  float ex = std::sin(angle_rad) * end_radius;
-  float ey = std::cos(angle_rad) * end_radius;
-  ex *= aspect_fix;
-
-  float outx = std::sin(angle_rad);
-  float outy = std::cos(angle_rad);
-
-  float tx = outy;
-  float ty = -outx;
-
-  // Ukuran kepala panah
-  float arrow_head_length = 0.08f;
-  float arrow_head_width = 0.04f;
-
-  // Base kepala panah (mundur dari tip)
-  float base_x = ex - outx * arrow_head_length * aspect_fix;
-  float base_y = ey - outy * arrow_head_length;
-
-  // Titik ujung panah
-  float tip_x = ex;
-  float tip_y = ey;
-
-  // Left wing
-  float left_x = base_x + tx * arrow_head_width * aspect_fix;
-  float left_y = base_y + ty * arrow_head_width;
-
-  // Right wing
-  float right_x = base_x - tx * arrow_head_width * aspect_fix;
-  float right_y = base_y - ty * arrow_head_width;
-
-  // Vertices: 1 garis single (berhenti di base) + kepala panah
-  float vertices[] = {
-    // Garis single - dari start ke BASE (bukan ke tip)
-    sx, sy,
-    base_x, base_y,
-    
-    // Kepala panah: base -> left_wing
-    base_x, base_y,
-    left_x, left_y,
-    
-    // left_wing -> tip
-    left_x, left_y,
-    tip_x, tip_y,
-    
-    // tip -> right_wing
-    tip_x, tip_y,
-    right_x, right_y,
-    
-    // right_wing -> base
-    right_x, right_y,
-    base_x, base_y
-  };
-
-  GLuint VAO, VBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  
-  glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-  
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-  glEnableVertexAttribArray(0);
-
-  glLineWidth(4.0f);
-  glDrawArrays(GL_LINES, 0, 10);  // 10 vertices = 5 garis
-  
-  glDeleteBuffers(1, &VBO);
-  glDeleteVertexArrays(1, &VAO);
-}
-
 int main() {
   if (!glfwInit()) {
     std::cerr << "GLFW init failed\n";
@@ -684,6 +445,9 @@ int main() {
     compas.drawCardinalMarkers();
     compas.drawHeadingIndicator();
 
+    // TAMBAHAN: Gambar simbol pesawat di center (SELALU MENGHADAP ATAS)
+    compas.drawAircraftSymbol(aspect_fix);
+
     // Gambar huruf cardinal
     drawTextAtBearingRadial(ttf_cardinal, "N",   0.0f, cardinal_radius, aspect_fix, heading_deg, R_yellow, G_yellow, B_yellow);
     drawTextAtBearingRadial(ttf_cardinal, "E",  90.0f, cardinal_radius, aspect_fix, heading_deg, R_yellow, G_yellow, B_yellow);
@@ -809,18 +573,18 @@ int main() {
     // WAYPOINT LEFT (EDAB) - Yellow arrow SINGLE
     glUniform3f(glGetUniformLocation(shader.id(), "uColor"), 
                 1.0f, 1.0f, 0.0f);  // Yellow
-    drawWaypointArrowSingle(wp_left_bearing, heading_deg, aspect_fix, 0.50f);
+    compas.drawWaypointArrowSingle(wp_left_bearing, heading_deg, aspect_fix, 0.50f);
     
     // WAYPOINT RIGHT (EDD1) - Green arrow DOUBLE
     glUniform3f(glGetUniformLocation(shader.id(), "uColor"), 
                 0.0f, 1.0f, 0.0f);  // Green
-    drawWaypointArrowDouble(wp_right_bearing, heading_deg, aspect_fix, 0.50f);
+    compas.drawWaypointArrowDouble(wp_right_bearing, heading_deg, aspect_fix, 0.50f);
 
     // GAMBAR BUG TRIANGLE 
     shader.use();
     glUniform3f(glGetUniformLocation(shader.id(), "uColor"), 
-                1.0f, 0.5f, 1.0f);
-    drawBugTriangle(bug_heading, heading_deg, aspect_fix, 0.73f);
+                1.0f, 0.0f, 1.0f);
+    compas.drawBugTriangle(bug_heading, heading_deg, aspect_fix, 0.73f);
 
     glfwSwapBuffers(window);
     glfwPollEvents();

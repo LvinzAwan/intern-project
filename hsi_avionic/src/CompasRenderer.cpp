@@ -311,5 +311,342 @@ void CompasRenderer::drawHeadingIndicator() {
 }
 
 
+void CompasRenderer::drawBugTriangle(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
+  // Hitung posisi center segitiga dengan cara yang sama seperti drawTextAtBearingRadial
+  float rotated_bearing = bearing_deg + heading_deg;
+  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
+  
+  // Posisi center segitiga
+  float cx = std::sin(angle_rad) * radius;
+  float cy = std::cos(angle_rad) * radius;
+  cx *= aspect_fix;
+
+  // Hitung orientasi ujung lancip (pointing inward)
+  // Vektor inward pointing ke center (berlawanan dengan posisi)
+  float inx = -std::sin(angle_rad);
+  float iny = -std::cos(angle_rad);
+
+  // Ukuran segitiga
+  float tri_size = 0.10f;
+  
+  // Tip segitiga (pointing inward ke center)
+  float x0 = cx + inx * tri_size * aspect_fix;
+  float y0 = cy + iny * tri_size;
+
+  // Vektor tangent (perpendicular ke arah inward, diputar 90 derajat)
+  float tx = -iny;
+  float ty = inx;
+
+  float half = tri_size * 0.6f;
+
+  // Bottom left vertex
+  float x1 = cx + tx * half * aspect_fix;
+  float y1 = cy + ty * half;
+
+  // Bottom right vertex
+  float x2 = cx - tx * half * aspect_fix;
+  float y2 = cy - ty * half;
+
+  float vertices[] = {x0, y0, x1, y1, x2, y2};
+
+  GLuint VAO, VBO;
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  
+  glBindVertexArray(VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  glLineWidth(5.0f);
+  glDrawArrays(GL_LINE_LOOP, 0, 3);
+  
+  glDeleteBuffers(1, &VBO);
+  glDeleteVertexArrays(1, &VAO);
+}
+
+// ARROW DOUBLE (untuk waypoint hijau/green)
+void CompasRenderer::drawWaypointArrowDouble(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
+  float rotated_bearing = bearing_deg + heading_deg;
+  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
+  
+  float start_radius = -0.50f;
+  float sx = std::sin(angle_rad) * start_radius;
+  float sy = std::cos(angle_rad) * start_radius;
+  sx *= aspect_fix;
+
+  float end_radius = radius;
+  float ex = std::sin(angle_rad) * end_radius;
+  float ey = std::cos(angle_rad) * end_radius;
+  ex *= aspect_fix;
+
+  float outx = std::sin(angle_rad);
+  float outy = std::cos(angle_rad);
+
+  float tx = outy;
+  float ty = -outx;
+
+  // Ukuran kepala panah
+  float arrow_head_length = 0.08f;
+  float arrow_head_width = 0.04f;
+
+  // Base kepala panah (mundur dari tip)
+  float base_x = ex - outx * arrow_head_length * aspect_fix;
+  float base_y = ey - outy * arrow_head_length;
+
+  // GARIS DOUBLE BERHENTI DI BASE (bukan di tip)
+  float line_offset = 0.015f;
+  
+  // Garis 1 (atas)
+  float sx1 = sx + tx * line_offset * aspect_fix;
+  float sy1 = sy + ty * line_offset;
+  float ex1 = base_x + tx * line_offset * aspect_fix;  // Berhenti di base
+  float ey1 = base_y + ty * line_offset;
+  
+  // Garis 2 (bawah)
+  float sx2 = sx - tx * line_offset * aspect_fix;
+  float sy2 = sy - ty * line_offset;
+  float ex2 = base_x - tx * line_offset * aspect_fix;  // Berhenti di base
+  float ey2 = base_y - ty * line_offset;
+
+  // Titik ujung panah
+  float tip_x = ex;
+  float tip_y = ey;
+
+  // Left wing
+  float left_x = base_x + tx * arrow_head_width * aspect_fix;
+  float left_y = base_y + ty * arrow_head_width;
+
+  // Right wing
+  float right_x = base_x - tx * arrow_head_width * aspect_fix;
+  float right_y = base_y - ty * arrow_head_width;
+
+  // Vertices: garis double (berhenti di base) + kepala panah
+  float vertices[] = {
+    // Garis double line 1 (atas) - dari start ke BASE
+    sx1, sy1,
+    ex1, ey1,
+    
+    // Garis double line 2 (bawah) - dari start ke BASE
+    sx2, sy2,
+    ex2, ey2,
+    
+    // Kepala panah: base -> left_wing
+    base_x, base_y,
+    left_x, left_y,
+    
+    // left_wing -> tip
+    left_x, left_y,
+    tip_x, tip_y,
+    
+    // tip -> right_wing
+    tip_x, tip_y,
+    right_x, right_y,
+    
+    // right_wing -> base
+    right_x, right_y,
+    base_x, base_y
+  };
+
+  GLuint VAO, VBO;
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  
+  glBindVertexArray(VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  glLineWidth(3.5f);
+  glDrawArrays(GL_LINES, 0, 12);  // 12 vertices = 6 garis
+  
+  glDeleteBuffers(1, &VBO);
+  glDeleteVertexArrays(1, &VAO);
+}
+
+// ARROW SINGLE (untuk waypoint kuning/yellow)
+void CompasRenderer::drawWaypointArrowSingle(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
+  float rotated_bearing = bearing_deg + heading_deg;
+  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
+  
+  float start_radius = - 0.50f;
+  float sx = std::sin(angle_rad) * start_radius;
+  float sy = std::cos(angle_rad) * start_radius;
+  sx *= aspect_fix;
+
+  float end_radius = radius;
+  float ex = std::sin(angle_rad) * end_radius;
+  float ey = std::cos(angle_rad) * end_radius;
+  ex *= aspect_fix;
+
+  float outx = std::sin(angle_rad);
+  float outy = std::cos(angle_rad);
+
+  float tx = outy;
+  float ty = -outx;
+
+  // Ukuran kepala panah
+  float arrow_head_length = 0.08f;
+  float arrow_head_width = 0.04f;
+
+  // Base kepala panah (mundur dari tip)
+  float base_x = ex - outx * arrow_head_length * aspect_fix;
+  float base_y = ey - outy * arrow_head_length;
+
+  // Titik ujung panah
+  float tip_x = ex;
+  float tip_y = ey;
+
+  // Left wing
+  float left_x = base_x + tx * arrow_head_width * aspect_fix;
+  float left_y = base_y + ty * arrow_head_width;
+
+  // Right wing
+  float right_x = base_x - tx * arrow_head_width * aspect_fix;
+  float right_y = base_y - ty * arrow_head_width;
+
+  // Vertices: 1 garis single (berhenti di base) + kepala panah
+  float vertices[] = {
+    // Garis single - dari start ke BASE (bukan ke tip)
+    sx, sy,
+    base_x, base_y,
+    
+    // Kepala panah: base -> left_wing
+    base_x, base_y,
+    left_x, left_y,
+    
+    // left_wing -> tip
+    left_x, left_y,
+    tip_x, tip_y,
+    
+    // tip -> right_wing
+    tip_x, tip_y,
+    right_x, right_y,
+    
+    // right_wing -> base
+    right_x, right_y,
+    base_x, base_y
+  };
+
+  GLuint VAO, VBO;
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  
+  glBindVertexArray(VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  glLineWidth(4.0f);
+  glDrawArrays(GL_LINES, 0, 10);  // 10 vertices = 5 garis
+  
+  glDeleteBuffers(1, &VBO);
+  glDeleteVertexArrays(1, &VAO);
+}
+
+void CompasRenderer::drawAircraftSymbol(float aspect_fix) {
+  // Ukuran pesawat - LEBIH RAMPING DAN PANJANG
+  float nose_y = 0.30f;           // Ujung hidung (lebih tinggi)
+  float cockpit_y = 0.20f;        // Cockpit
+  float wing_front_y = 0.08f;     // Depan sayap
+  float wing_back_y = -0.02f;     // Belakang sayap
+  float body_mid_y = -0.12f;      // Tengah badan
+  float tail_wing_y = -0.16f;     // Ekor horizontal
+  float tail_end_y = -0.24f;      // Ujung ekor vertikal
+  
+  float cockpit_w = 0.040f;       // Lebar cockpit (lebih ramping)
+  float body_w = 0.048f;          // Lebar badan (lebih ramping)
+  float wing_w = 0.50f;           // Lebar sayap (LEBIH PANJANG)
+  float wing_back_w = 0.58f;      // Lebar belakang sayap
+  float tail_wing_w = 0.12f;      // Lebar ekor horizontal (LEBIH PANJANG)
+  float tail_end_w = 0.26f;       // Lebar ujung ekor horizontal
+  float tail_vert_w = 0.040f;     // Lebar ekor vertikal (diperbesar)
+  
+  std::vector<float> vertices = {
+    // === NOSE (Hidung lancip dengan lengkungan halus) ===
+    0.0f, nose_y,
+    -cockpit_w * 0.6f * aspect_fix, nose_y - 0.04f,
+    -cockpit_w * aspect_fix, cockpit_y,
+    
+    // === BODY KIRI (dari cockpit ke wing) ===
+    -body_w * 0.9f * aspect_fix, cockpit_y - 0.02f,
+    -body_w * aspect_fix, wing_front_y + 0.04f,
+    
+    // === WING KIRI (PANJANG) ===
+    -wing_w * 0.5f * aspect_fix, wing_front_y,
+    -wing_back_w * 0.5f * aspect_fix, wing_back_y,
+    
+    // === BODY KIRI (dari wing ke tail wing) ===
+    -body_w * aspect_fix, wing_back_y,
+    -body_w * aspect_fix, body_mid_y,
+    -body_w * 0.85f * aspect_fix, tail_wing_y,
+    
+    // === TAIL WING KIRI (Ekor horizontal PANJANG) ===
+    -tail_wing_w * 0.6f * aspect_fix, tail_wing_y,
+    -tail_end_w * 0.6f * aspect_fix, tail_end_y,
+    
+    // === TAIL VERTIKAL KIRI (lancip ke DALAM) ===
+    -tail_vert_w * aspect_fix, tail_end_y,
+    -tail_vert_w * 0.4f * aspect_fix, tail_end_y + 0.03f,  // Naik ke dalam
+    
+    // === TAIL VERTIKAL TENGAH (LANCIP KE DALAM - V shape terbalik) ===
+    0.0f, tail_end_y - 0.03f,  // Puncak V di dalam (lebih tinggi dari tail_end_y)
+    
+    // === TAIL VERTIKAL KANAN (lancip ke DALAM) ===
+    tail_vert_w * 0.4f * aspect_fix, tail_end_y + 0.03f,  // Naik ke dalam
+    tail_vert_w * aspect_fix, tail_end_y,
+    
+    // === TAIL WING KANAN (Ekor horizontal PANJANG) ===
+    tail_end_w * 0.6f * aspect_fix, tail_end_y,
+    tail_wing_w * 0.6f * aspect_fix, tail_wing_y,
+    
+    // === BODY KANAN (dari tail wing ke wing) ===
+    body_w * 0.85f * aspect_fix, tail_wing_y,
+    body_w * aspect_fix, body_mid_y,
+    body_w * aspect_fix, wing_back_y,
+    
+    // === WING KANAN (PANJANG) ===
+    wing_back_w * 0.5f * aspect_fix, wing_back_y,
+    wing_w * 0.5f * aspect_fix, wing_front_y,
+    
+    // === BODY KANAN (dari wing ke cockpit) ===
+    body_w * aspect_fix, wing_front_y +  0.04f,
+    body_w * 0.9f * aspect_fix, cockpit_y - 0.02f,
+    
+    // === NOSE KANAN (lengkungan halus) ===
+    cockpit_w * aspect_fix, cockpit_y,
+    cockpit_w * 0.6f * aspect_fix, nose_y - 0.04f,
+    0.0f, nose_y
+  };
+
+  GLuint VAO, VBO;
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  
+  glBindVertexArray(VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  shader_.use();
+  GLint loc = glGetUniformLocation(shader_.id(), "uColor");
+  glUniform3f(loc, 0.55f, 0.55f, 0.55f);  // Gray color
+
+  glLineWidth(3.5f);
+  glDrawArrays(GL_LINE_STRIP, 0, vertices.size() / 2);
+  
+  glDeleteBuffers(1, &VBO);
+  glDeleteVertexArrays(1, &VAO);
+}
+
+
 
 

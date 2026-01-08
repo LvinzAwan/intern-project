@@ -15,6 +15,11 @@ public:
   void drawCardinalMarkers();
   void drawHeadingIndicator();
 
+  void drawBugTriangle(float bearing_deg, float heading_deg, float aspect_fix, float radius);
+  void drawWaypointArrowDouble(float bearing_deg, float heading_deg, float aspect_fix, float radius);
+  void drawWaypointArrowSingle(float bearing_deg, float heading_deg, float aspect_fix, float radius);
+  void drawAircraftSymbol(float aspect_fix);
+
 private:
   void buildRingGeometry(float radius_ndc, int segments);
   void buildTicksGeometry(float radius_ndc,
