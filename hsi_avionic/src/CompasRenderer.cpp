@@ -30,9 +30,9 @@ bool CompasRenderer::init(int width, int height) {
 
   tick_outer_r_ = 0.70f;
   tick_inner_r_90_ = 0.10f;
-  tick_inner_r_30_ = 0.07f;
-  tick_inner_r_10_ = 0.05f;
-  tick_inner_r_5_  = 0.03f;
+  tick_inner_r_30_ = 0.08f;
+  tick_inner_r_10_ = 0.06f;
+  tick_inner_r_5_  = 0.04f;
   
   buildTicksGeometry(tick_outer_r_, tick_inner_r_90_, tick_inner_r_30_, tick_inner_r_10_, tick_inner_r_5_);
   buildCardinalMarkersGeometry(0.70f, 0.06f);

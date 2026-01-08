@@ -62,7 +62,7 @@ private:
 
   float tick_outer_r_ = 0.70f;
   float tick_inner_r_90_ = 0.10f;
-  float tick_inner_r_30_ = 0.07f;
-  float tick_inner_r_10_ = 0.05f;
-  float tick_inner_r_5_  = 0.03f;
+  float tick_inner_r_30_ = 0.08f;
+  float tick_inner_r_10_ = 0.06f;
+  float tick_inner_r_5_  = 0.04f;
 };
