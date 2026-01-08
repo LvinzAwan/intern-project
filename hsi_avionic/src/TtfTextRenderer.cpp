@@ -104,29 +104,48 @@ bool TtfTextRenderer::init(const std::string& ttf_path, float pixel_height) {
   // bake atlas grayscale
   std::vector<unsigned char> bitmap(atlas_w_ * atlas_h_, 0);
 
-  // stb_truetype punya fungsi bake yang enak buat ASCII basic
-  // Kita simpan hasilnya ke chars_ tapi perlu adapt struct sesuai stb
-  stbtt_bakedchar baked[96];
-  int res = stbtt_BakeFontBitmap(ttf.data(), 0, pixel_height,
-                                 bitmap.data(), atlas_w_, atlas_h_,
-                                 32, 96, baked);
-  if (res <= 0) {
-    std::cerr << "stbtt_BakeFontBitmap failed (atlas too small?)\n";
+  // Gunakan stbtt_PackBegin untuk lebih fleksibel
+  stbtt_pack_context pc;
+  if (!stbtt_PackBegin(&pc, bitmap.data(), atlas_w_, atlas_h_, 0, 1, nullptr)) {
+    std::cerr << "stbtt_PackBegin failed\n";
     return false;
   }
 
-  // copy ke struct lokal (biar header kita gak tergantung tipe stb)
-  for (int i = 0; i < 96; ++i) {
+  stbtt_PackSetOversampling(&pc, 1, 1);
+
+  // Bake range 1: ASCII (32-126)
+  stbtt_packedchar baked_ascii[95];
+  stbtt_PackFontRange(&pc, ttf.data(), 0, pixel_height, 32, 95, baked_ascii);
+
+  // Bake range 2: Simbol derajat (176-176)
+  stbtt_packedchar baked_special[1];
+  stbtt_PackFontRange(&pc, ttf.data(), 0, pixel_height, 176, 1, baked_special);
+
+  stbtt_PackEnd(&pc);
+
+  // Copy ASCII ke chars_ (index 0-94 untuk char 32-126)
+  for (int i = 0; i < 95; ++i) {
     chars_[i] = {
-        static_cast<float>(baked[i].x0),
-        static_cast<float>(baked[i].y0),
-        static_cast<float>(baked[i].x1),
-        static_cast<float>(baked[i].y1),
-        baked[i].xoff,
-        baked[i].yoff,
-        baked[i].xadvance
+        static_cast<float>(baked_ascii[i].x0),
+        static_cast<float>(baked_ascii[i].y0),
+        static_cast<float>(baked_ascii[i].x1),
+        static_cast<float>(baked_ascii[i].y1),
+        baked_ascii[i].xoff,
+        baked_ascii[i].yoff,
+        baked_ascii[i].xadvance
     };
   }
+
+  // Copy simbol derajat ke index 144 (char 176 - 32 = 144)
+  chars_[144] = {
+      static_cast<float>(baked_special[0].x0),
+      static_cast<float>(baked_special[0].y0),
+      static_cast<float>(baked_special[0].x1),
+      static_cast<float>(baked_special[0].y1),
+      baked_special[0].xoff,
+      baked_special[0].yoff,
+      baked_special[0].xadvance
+  };
 
   // create texture (single channel)
   glGenTextures(1, &tex_);
@@ -164,25 +183,32 @@ void TtfTextRenderer::drawTextNDC(const std::string& text, float x_ndc, float y_
                                  float r, float g, float b) {
   if (!program_ || !tex_) return;
 
-  // Kita gambar dalam NDC langsung.
-  // Anggap 1 pixel atlas ~ 1 unit "pixel" di layar virtual.
-  // Untuk NDC, kita perlu skala. Biar simple: pakai faktor kecil.
-  // Nanti kita kalibrasi di step berikutnya.
-  float s = 0.0020f; // nanti kamu adjust biar pas
+  float s = 0.0020f;
 
   std::vector<float> verts;
   verts.reserve(text.size() * 6 * 4);
 
   float x = 0.0f, y = 0.0f;
-  for (char c : text) {
-    if (c < 32 || c > 127) continue;
-    const BakedChar& bc = chars_[c - 32];
+  for (unsigned char c : text) {
+    const BakedChar* bc = nullptr;
+    
+    // Handle ASCII (32-126)
+    if (c >= 32 && c <= 126) {
+      bc = &chars_[c - 32];
+    }
+    // Handle simbol derajat (176)
+    else if (c == 176) {
+      bc = &chars_[144];  // Index 144 untuk derajat
+    }
+    else {
+      continue;  // Skip karakter tidak dikenal
+    }
 
     // posisi glyph dalam "pixel" space
-    float x0 = x + bc.xoff;
-    float y0 = y - bc.yoff; // perhatikan: stb yoff ke atas
-    float x1 = x0 + (bc.x1 - bc.x0);
-    float y1 = y0 - (bc.y1 - bc.y0);
+    float x0 = x + bc->xoff;
+    float y0 = y - bc->yoff;
+    float x1 = x0 + (bc->x1 - bc->x0);
+    float y1 = y0 - (bc->y1 - bc->y0);
 
     // convert ke NDC + anchor
     float X0 = x_ndc + x0 * s;
@@ -191,17 +217,16 @@ void TtfTextRenderer::drawTextNDC(const std::string& text, float x_ndc, float y_
     float Y1 = y_ndc + y1 * s;
 
     // UV
-    float U0 = bc.x0 / (float)atlas_w_;
-    float V0 = bc.y0 / (float)atlas_h_;
-    float U1 = bc.x1 / (float)atlas_w_;
-    float V1 = bc.y1 / (float)atlas_h_;
+    float U0 = bc->x0 / (float)atlas_w_;
+    float V0 = bc->y0 / (float)atlas_h_;
+    float U1 = bc->x1 / (float)atlas_w_;
+    float V1 = bc->y1 / (float)atlas_h_;
 
     // 2 tris
-    // (X0,Y0)-(X1,Y0)-(X1,Y1) and (X0,Y0)-(X1,Y1)-(X0,Y1)
     verts.insert(verts.end(), { X0, Y0, U0, V0,  X1, Y0, U1, V0,  X1, Y1, U1, V1 });
     verts.insert(verts.end(), { X0, Y0, U0, V0,  X1, Y1, U1, V1,  X0, Y1, U0, V1 });
 
-    x += bc.xadvance;
+    x += bc->xadvance;
   }
 
   glUseProgram(program_);
@@ -233,21 +258,28 @@ void TtfTextRenderer::drawTextCenteredNDC(const std::string& text, float cx_ndc,
   float minx =  1e9f, miny =  1e9f;
   float maxx = -1e9f, maxy = -1e9f;
 
-  for (char c : text) {
-    if (c < 32 || c > 127) continue;
-    const BakedChar& bc = chars_[c - 32];
+  for (unsigned char c : text) {
+    const BakedChar* bc = nullptr;
+    
+    if (c >= 32 && c <= 126) {
+      bc = &chars_[c - 32];
+    } else if (c == 176) {
+      bc = &chars_[144];
+    } else {
+      continue;
+    }
 
-    float gx0 = x + bc.xoff;
-    float gy0 = 0.0f - bc.yoff;
-    float gx1 = gx0 + (bc.x1 - bc.x0);
-    float gy1 = gy0 - (bc.y1 - bc.y0);
+    float gx0 = x + bc->xoff;
+    float gy0 = 0.0f - bc->yoff;
+    float gx1 = gx0 + (bc->x1 - bc->x0);
+    float gy1 = gy0 - (bc->y1 - bc->y0);
 
     if (gx0 < minx) minx = gx0;
     if (gy1 < miny) miny = gy1;
     if (gx1 > maxx) maxx = gx1;
     if (gy0 > maxy) maxy = gy0;
 
-    x += bc.xadvance;
+    x += bc->xadvance;
   }
 
   if (minx > maxx) {
@@ -279,7 +311,7 @@ void TtfTextRenderer::drawTextCenteredNDCRotated(const char* text,
   float cos_a = std::cos(angle_rad);
   float sin_a = std::sin(angle_rad);
 
-  float s = 0.0020f; // Sama dengan skala di drawTextNDC
+  float s = 0.0020f;  // Tambahkan semicolon di sini!
 
   std::vector<float> verts;
   verts.reserve(std::strlen(text) * 6 * 4);
@@ -289,21 +321,29 @@ void TtfTextRenderer::drawTextCenteredNDCRotated(const char* text,
   float minx =  1e9f, miny =  1e9f;
   float maxx = -1e9f, maxy = -1e9f;
 
-  for (const char* c = text; *c; ++c) {
-    if (*c < 32 || *c > 127) continue;
-    const BakedChar& bc = chars_[*c - 32];
+  for (const char* pc = text; *pc; ++pc) {
+    unsigned char c = (unsigned char)*pc;
+    const BakedChar* bc = nullptr;
+    
+    if (c >= 32 && c <= 126) {
+      bc = &chars_[c - 32];
+    } else if (c == 176) {
+      bc = &chars_[144];
+    } else {
+      continue;
+    }
 
-    float gx0 = x + bc.xoff;
-    float gy0 = 0.0f - bc.yoff;
-    float gx1 = gx0 + (bc.x1 - bc.x0);
-    float gy1 = gy0 - (bc.y1 - bc.y0);
+    float gx0 = x + bc->xoff;
+    float gy0 = 0.0f - bc->yoff;
+    float gx1 = gx0 + (bc->x1 - bc->x0);
+    float gy1 = gy0 - (bc->y1 - bc->y0);
 
     if (gx0 < minx) minx = gx0;
     if (gy1 < miny) miny = gy1;
     if (gx1 > maxx) maxx = gx1;
     if (gy0 > maxy) maxy = gy0;
 
-    x += bc.xadvance;
+    x += bc->xadvance;
   }
 
   if (minx > maxx) return; // string kosong
@@ -314,21 +354,29 @@ void TtfTextRenderer::drawTextCenteredNDCRotated(const char* text,
 
   // Render dengan rotasi
   x = 0.0f;
-  for (const char* c = text; *c; ++c) {
-    if (*c < 32 || *c > 127) continue;
-    const BakedChar& bc = chars_[*c - 32];
+  for (const char* pc = text; *pc; ++pc) {
+    unsigned char c = (unsigned char)*pc;
+    const BakedChar* bc = nullptr;
+    
+    if (c >= 32 && c <= 126) {
+      bc = &chars_[c - 32];
+    } else if (c == 176) {
+      bc = &chars_[144];
+    } else {
+      continue;
+    }
 
     // Posisi glyph dalam font units (dengan offset untuk centering)
-    float x0 = x + bc.xoff + offset_x;
-    float y0 = 0.0f - bc.yoff + offset_y;
-    float x1 = x0 + (bc.x1 - bc.x0);
-    float y1 = y0 - (bc.y1 - bc.y0);
+    float x0 = x + bc->xoff + offset_x;
+    float y0 = 0.0f - bc->yoff + offset_y;
+    float x1 = x0 + (bc->x1 - bc->x0);
+    float y1 = y0 - (bc->y1 - bc->y0);
 
     // UV coordinates
-    float U0 = bc.x0 / (float)atlas_w_;
-    float V0 = bc.y0 / (float)atlas_h_;
-    float U1 = bc.x1 / (float)atlas_w_;
-    float V1 = bc.y1 / (float)atlas_h_;
+    float U0 = bc->x0 / (float)atlas_w_;
+    float V0 = bc->y0 / (float)atlas_h_;
+    float U1 = bc->x1 / (float)atlas_w_;
+    float V1 = bc->y1 / (float)atlas_h_;
 
     // 4 corners (dalam font units, belum di-scale)
     float corners[4][2] = {
@@ -365,7 +413,7 @@ void TtfTextRenderer::drawTextCenteredNDCRotated(const char* text,
       rotated[3][0], rotated[3][1], U0, V1
     });
 
-    x += bc.xadvance;
+    x += bc->xadvance;
   }
 
   // Render
@@ -400,17 +448,25 @@ void TtfTextRenderer::drawTextLeftAligned(const char* text, float x, float y,
   float x_pos = 0.0f;
   float minx = 1e9f, maxx = -1e9f;
 
-  for (char c : std::string(text)) {
-    if (c < 32 || c > 127) continue;
-    const BakedChar& bc = chars_[c - 32];
+  for (const char* pc = text; *pc; ++pc) {
+    unsigned char c = (unsigned char)*pc;
+    const BakedChar* bc = nullptr;
+    
+    if (c >= 32 && c <= 126) {
+      bc = &chars_[c - 32];
+    } else if (c == 176) {
+      bc = &chars_[144];
+    } else {
+      continue;
+    }
 
-    float gx0 = x_pos + bc.xoff;
-    float gx1 = gx0 + (bc.x1 - bc.x0);
+    float gx0 = x_pos + bc->xoff;
+    float gx1 = gx0 + (bc->x1 - bc->x0);
 
     if (gx0 < minx) minx = gx0;
     if (gx1 > maxx) maxx = gx1;
 
-    x_pos += bc.xadvance;
+    x_pos += bc->xadvance;
   }
 
   if (minx > maxx) return; // string kosong
@@ -425,22 +481,30 @@ void TtfTextRenderer::drawTextRightAligned(const char* text, float x, float y,
                                           float r, float g, float b) {
   if (!text || !program_ || !tex_) return;
 
-  // Hitung bounding box untuk mengetahui lebar text
   float s = 0.0020f;
   float x_pos = 0.0f;
   float minx = 1e9f, maxx = -1e9f;
 
-  for (char c : std::string(text)) {
-    if (c < 32 || c > 127) continue;
-    const BakedChar& bc = chars_[c - 32];
+  // Hitung bounding box untuk mengetahui lebar text
+  for (const char* pc = text; *pc; ++pc) {
+    unsigned char c = (unsigned char)*pc;
+    const BakedChar* bc = nullptr;
+    
+    if (c >= 32 && c <= 126) {
+      bc = &chars_[c - 32];
+    } else if (c == 176) {
+      bc = &chars_[144];
+    } else {
+      continue;
+    }
 
-    float gx0 = x_pos + bc.xoff;
-    float gx1 = gx0 + (bc.x1 - bc.x0);
+    float gx0 = x_pos + bc->xoff;
+    float gx1 = gx0 + (bc->x1 - bc->x0);
 
     if (gx0 < minx) minx = gx0;
     if (gx1 > maxx) maxx = gx1;
 
-    x_pos += bc.xadvance;
+    x_pos += bc->xadvance;
   }
 
   if (minx > maxx) return; // string kosong
@@ -448,6 +512,6 @@ void TtfTextRenderer::drawTextRightAligned(const char* text, float x, float y,
   // x adalah posisi kanan, jadi geser ke kiri sejauh (maxx * s)
   float x_ndc = x - (maxx * s);
   
-  drawTextNDC(text, x_ndc, y, r, g, b);
+  drawTextNDC(std::string(text), x_ndc, y, r, g, b);
 }
 

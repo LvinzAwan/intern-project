@@ -59,46 +59,6 @@ void drawHeadingBox(float x, float y, float width, float height) {
   glDeleteVertexArrays(1, &VAO);
 }
 
-// Tambah fungsi baru untuk text alignment
-void drawTextLeftAligned(TtfTextRenderer& ttf, const char* text, float x, float y, 
-                        float r, float g, float b) {
-  // Render text left-aligned (x adalah posisi kiri)
-  // Asumsi: drawTextCenteredNDC menggunakan center, jadi kita offset
-  ttf.drawTextCenteredNDC(text, x + 0.08f, y, r, g, b);  // Offset untuk left align
-}
-
-void drawTextRightAligned(TtfTextRenderer& ttf, const char* text, float x, float y, 
-                         float r, float g, float b) {
-  // Render text right-aligned (x adalah posisi kanan)
-  ttf.drawTextCenteredNDC(text, x - 0.08f, y, r, g, b);  // Offset untuk right align
-}
-
-// Fungsi alignment terhadap FRAME (tepi layar) - PERBAIKAN
-void drawTextLeftAlignedFrame(TtfTextRenderer& ttf, const char* text, float offset_from_left, float y, 
-                              float r, float g, float b) {
-  // offset_from_left: jarak dari tepi kiri (-1.0 ke kiri, 0 center)
-  // Offset agar text bermula dari left_offset, bukan center
-  // Estimasi: setiap karakter ~0.025 width (untuk text centered)
-  int text_length = strlen(text);
-  float text_width_estimate = text_length * 0.025f;
-  
-  // Posisi agar text dimulai dari offset_from_left
-  float adjusted_x = offset_from_left + text_width_estimate;
-  ttf.drawTextCenteredNDC(text, adjusted_x, y, r, g, b);
-}
-
-void drawTextRightAlignedFrame(TtfTextRenderer& ttf, const char* text, float offset_from_right, float y, 
-                               float r, float g, float b) {
-  // offset_from_right: jarak dari tepi kanan (1.0 ke kanan, 0 center)
-  // Offset agar text berakhir di right_offset
-  int text_length = strlen(text);
-  float text_width_estimate = text_length * 0.025f;
-  
-  // Posisi agar text berakhir di offset_from_right
-  float adjusted_x = offset_from_right - text_width_estimate;
-  ttf.drawTextCenteredNDC(text, adjusted_x, y, r, g, b);
-}
-
 // ==================== INFO GROUP STRUCTURE ====================
 struct InfoGroup {
   const char* label;
@@ -137,6 +97,62 @@ struct WaypointGroup {
   TtfTextRenderer* bearing_font;
   TtfTextRenderer* info_font;
 };
+
+void drawBugTriangle(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
+  // Hitung posisi center segitiga dengan cara yang sama seperti drawTextAtBearingRadial
+  float rotated_bearing = bearing_deg + heading_deg;
+  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
+  
+  // Posisi center segitiga
+  float cx = std::sin(angle_rad) * radius;
+  float cy = std::cos(angle_rad) * radius;
+  cx *= aspect_fix;
+
+  // Hitung orientasi ujung lancip (pointing inward)
+  // Vektor inward pointing ke center (berlawanan dengan posisi)
+  float inx = -std::sin(angle_rad);
+  float iny = -std::cos(angle_rad);
+
+  // Ukuran segitiga
+  float tri_size = 0.073f;
+  
+  // Tip segitiga (pointing inward ke center)
+  float x0 = cx + inx * tri_size * aspect_fix;
+  float y0 = cy + iny * tri_size;
+
+  // Vektor tangent (perpendicular ke arah inward, diputar 90 derajat)
+  float tx = -iny;
+  float ty = inx;
+
+  float half = tri_size * 0.6f;
+
+  // Bottom left vertex
+  float x1 = cx + tx * half * aspect_fix;
+  float y1 = cy + ty * half;
+
+  // Bottom right vertex
+  float x2 = cx - tx * half * aspect_fix;
+  float y2 = cy - ty * half;
+
+  float vertices[] = {x0, y0, x1, y1, x2, y2};
+
+  GLuint VAO, VBO;
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  
+  glBindVertexArray(VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  glLineWidth(4.0f);
+  glDrawArrays(GL_LINE_LOOP, 0, 3);
+  
+  glDeleteBuffers(1, &VBO);
+  glDeleteVertexArrays(1, &VAO);
+}
 
 int main() {
   if (!glfwInit()) {
@@ -255,21 +271,25 @@ int main() {
   // GPS Status
   const char* gps_status = "GPS OK";
   
-  // Waypoint 1 (EDAB) - LEFT
-  struct Waypoint {
-    float bearing;
-    const char* name;
-    float distance;
-    const char* runway;
-    const char* app_freq;
-    const char* info_freq;
-  };
+  // WAYPOINT LEFT (EDAB)
+  float wp_left_bearing = 347;
+  float wp_left_distance = 861.9f;
+  const char* wp_left_name = "EDAB";
+  const char* wp_left_runway = "BRUTZEM";
+  float wp_left_app_freq = 125.875f;
+  float wp_left_info_freq = 120.605f;
   
-  Waypoint wp_left = {347, "EDAB", 861.9f, "BRUTZEM", "(APP)125.875", "(INF)120.605"};
-  Waypoint wp_right = {324, "EDD1", 1000, "LSZH", "(ACC)119.120", "(ACC)134.000"};
+  // WAYPOINT RIGHT (EDD1)
+  float wp_right_bearing = 324;
+  float wp_right_distance = 1000;
+  const char* wp_right_name = "EDD1";
+  const char* wp_right_runway = "LSZH";
+  float wp_right_app_freq = 119.120f;
+  float wp_right_info_freq = 134.000f;
   
   // Bug heading
-  float bug_heading = 349;
+  // float bug_heading = 349;
+   float bug_heading = 0;
 
   float heading_deg = 0.0f;
   compas.setHeadingDeg(heading_deg);
@@ -351,26 +371,28 @@ int main() {
   // LEFT SIDE - WAYPOINT EDAB (Yellow)
   struct {
     float bearing, distance;
-    const char* name, *runway, *app_freq, *info_freq;
+    const char* name, *runway;
+    float app_freq, info_freq;  // Ubah dari const char* menjadi float
     float x, y_start;
     float r, g, b;
   } wp_left_group = {
-    wp_left.bearing, wp_left.distance,
-    wp_left.name, wp_left.runway, wp_left.app_freq, wp_left.info_freq,
-    -0.70f, -0.40f,  // Jarak dari tepi kiri: -0.95f
+    wp_left_bearing, wp_left_distance,
+    wp_left_name, wp_left_runway, wp_left_app_freq, wp_left_info_freq,
+    -0.70f, -0.40f,
     R_yellow, G_yellow, B_yellow
   };
 
   // RIGHT SIDE - WAYPOINT EDD1 (Green)
   struct {
     float bearing, distance;
-    const char* name, *runway, *app_freq, *info_freq;
+    const char* name, *runway;
+    float app_freq, info_freq;  // Ubah dari const char* menjadi float
     float x, y_start;
     float r, g, b;
   } wp_right_group = {
-    wp_right.bearing, wp_right.distance,
-    wp_right.name, wp_right.runway, wp_right.app_freq, wp_right.info_freq,
-    0.70f, -0.40f,  // Jarak dari tepi kanan: 0.95f
+    wp_right_bearing, wp_right_distance,
+    wp_right_name, wp_right_runway, wp_right_app_freq, wp_right_info_freq,
+    0.70f, -0.40f,
     R_green, G_green, 0.0f
   };
 
@@ -403,11 +425,26 @@ int main() {
   // RIGHT SIDE OFFSET (jarak dari tepi kanan, 1.0 adalah paling kanan)
   float right_offset = 0.92f;
 
+  // ==================== SETUP SHADER (SEBELUM LOOP) ====================
+  Shader shader;
+  const char* vs = R"(#version 330 core
+    layout (location = 0) in vec2 aPos;
+    uniform vec3 uColor;
+    void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+  )";
+  const char* fs = R"(#version 330 core
+    uniform vec3 uColor;
+    out vec4 FragColor;
+    void main() { FragColor = vec4(uColor, 1.0); }
+  )";
+  shader.build(vs, fs);
+
   while (!glfwWindowShouldClose(window)) {
     double current_time = glfwGetTime();
     float delta_time = (float)(current_time - last_time);
     last_time = current_time;
 
+    // Kontrol heading pesawat (LEFT/RIGHT)
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
       heading_deg += 90.0f * delta_time;
       if (heading_deg >= 360.0f) heading_deg -= 360.0f;
@@ -418,9 +455,23 @@ int main() {
       if (heading_deg < 0.0f) heading_deg += 360.0f;
       compas.setHeadingDeg(heading_deg);
     }
+
+    // Kontrol bug heading (UP/DOWN)
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+      bug_heading += 90.0f * delta_time;
+      if (bug_heading >= 360.0f) bug_heading -= 360.0f;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+      bug_heading -= 90.0f * delta_time;
+      if (bug_heading < 0.0f) bug_heading += 360.0f;
+    }
+
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
       glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+
+    // UPDATE BUG GROUP VALUE - TAMBAHAN INI
+    bug_group.value = bug_heading;
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -445,16 +496,6 @@ int main() {
     }
 
     // Gambar box untuk heading indicator
-    Shader shader;
-    const char* vs = R"(#version 330 core
-      layout (location = 0) in vec2 aPos;
-      void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
-    )";
-    const char* fs = R"(#version 330 core
-      out vec4 FragColor;
-      void main() { FragColor = vec4(1.0, 1.0, 1.0, 1.0); }
-    )";
-    shader.build(vs, fs);
     shader.use();
     drawHeadingBox(0.0f, 0.82f, 0.18f, 0.10f);
 
@@ -507,41 +548,63 @@ int main() {
                                   alt_group.value_r, alt_group.value_g, alt_group.value_b);
 
     // WAYPOINT LEFT (EDAB) - Left aligned
-    snprintf(wp_left_bearing_str, sizeof(wp_left_bearing_str), "%.0f", wp_left_group.bearing);
+    snprintf(wp_left_bearing_str, sizeof(wp_left_bearing_str), "%.0f deg", wp_left_bearing);
     ttf_info.drawTextLeftAligned(wp_left_bearing_str, left_offset, wp_left_group.y_start,
                                  wp_left_group.r, wp_left_group.g, wp_left_group.b);
-    ttf_info.drawTextLeftAligned(wp_left_group.name, left_offset, wp_left_group.y_start - 0.10f,
+    ttf_info.drawTextLeftAligned(wp_left_name, left_offset, wp_left_group.y_start - 0.10f,
                                  wp_left_group.r, wp_left_group.g, wp_left_group.b);
-    snprintf(wp_left_dist_str, sizeof(wp_left_dist_str), "%.1f km", wp_left_group.distance);
+    snprintf(wp_left_dist_str, sizeof(wp_left_dist_str), "%.1f km", wp_left_distance);
     ttf_info_label.drawTextLeftAligned(wp_left_dist_str, left_offset, wp_left_group.y_start - 0.20f,
                                        wp_left_group.r, wp_left_group.g, wp_left_group.b);
-    ttf_info_label.drawTextLeftAligned(wp_left_group.runway, left_offset, wp_left_group.y_start - 0.30f,
+    ttf_info_label.drawTextLeftAligned(wp_left_runway, left_offset, wp_left_group.y_start - 0.30f,
                                        wp_left_group.r, wp_left_group.g, wp_left_group.b);
-    ttf_info_label.drawTextLeftAligned(wp_left_group.app_freq, left_offset, wp_left_group.y_start - 0.40f,
+    
+    // APP FREQ
+    char wp_left_app_freq_str[32];
+    snprintf(wp_left_app_freq_str, sizeof(wp_left_app_freq_str), "(APP)%.3f", wp_left_app_freq);
+    ttf_info_label.drawTextLeftAligned(wp_left_app_freq_str, left_offset, wp_left_group.y_start - 0.40f,
                                        wp_left_group.r, wp_left_group.g, wp_left_group.b);
-    ttf_info_label.drawTextLeftAligned(wp_left_group.info_freq, left_offset, wp_left_group.y_start - 0.50f,
+    
+    // INFO FREQ
+    char wp_left_info_freq_str[32];
+    snprintf(wp_left_info_freq_str, sizeof(wp_left_info_freq_str), "(INF)%.3f", wp_left_info_freq);
+    ttf_info_label.drawTextLeftAligned(wp_left_info_freq_str, left_offset, wp_left_group.y_start - 0.50f,
                                        wp_left_group.r, wp_left_group.g, wp_left_group.b);
 
     // WAYPOINT RIGHT (EDD1) - Right aligned
-    snprintf(wp_right_bearing_str, sizeof(wp_right_bearing_str), "%.0f", wp_right_group.bearing);
+    snprintf(wp_right_bearing_str, sizeof(wp_right_bearing_str), "%.0f deg", wp_right_bearing);
     ttf_info.drawTextRightAligned(wp_right_bearing_str, right_offset, wp_right_group.y_start,
                                   wp_right_group.r, wp_right_group.g, wp_right_group.b);
-    ttf_info.drawTextRightAligned(wp_right_group.name, right_offset, wp_right_group.y_start - 0.10f,
+    ttf_info.drawTextRightAligned(wp_right_name, right_offset, wp_right_group.y_start - 0.10f,
                                   wp_right_group.r, wp_right_group.g, wp_right_group.b);
-    snprintf(wp_right_dist_str, sizeof(wp_right_dist_str), ">%.0f km", wp_right_group.distance);
+    snprintf(wp_right_dist_str, sizeof(wp_right_dist_str), ">%.0f km", wp_right_distance);
     ttf_info_label.drawTextRightAligned(wp_right_dist_str, right_offset, wp_right_group.y_start - 0.20f,
                                         wp_right_group.r, wp_right_group.g, wp_right_group.b);
-    ttf_info_label.drawTextRightAligned(wp_right_group.runway, right_offset, wp_right_group.y_start - 0.30f,
+    ttf_info_label.drawTextRightAligned(wp_right_runway, right_offset, wp_right_group.y_start - 0.30f,
                                         wp_right_group.r, wp_right_group.g, wp_right_group.b);
-    ttf_info_label.drawTextRightAligned(wp_right_group.app_freq, right_offset, wp_right_group.y_start - 0.40f,
+    
+    // APP FREQ
+    char wp_right_app_freq_str[32];
+    snprintf(wp_right_app_freq_str, sizeof(wp_right_app_freq_str), "(ACC)%.3f", wp_right_app_freq);
+    ttf_info_label.drawTextRightAligned(wp_right_app_freq_str, right_offset, wp_right_group.y_start - 0.40f,
                                         wp_right_group.r, wp_right_group.g, wp_right_group.b);
-    ttf_info_label.drawTextRightAligned(wp_right_group.info_freq, right_offset, wp_right_group.y_start - 0.50f,
+    
+    // INFO FREQ
+    char wp_right_info_freq_str[32];
+    snprintf(wp_right_info_freq_str, sizeof(wp_right_info_freq_str), "(ACC)%.3f", wp_right_info_freq);
+    ttf_info_label.drawTextRightAligned(wp_right_info_freq_str, right_offset, wp_right_group.y_start - 0.50f,
                                         wp_right_group.r, wp_right_group.g, wp_right_group.b);
-
+    
     // BUG HEADING (Center, Magenta)
-    snprintf(bug_str, sizeof(bug_str), "BUG  %.0f", bug_group.value);
+    snprintf(bug_str, sizeof(bug_str), "BUG  %.0f deg", bug_group.value);
     ttf_info.drawTextCenteredNDC(bug_str, bug_group.x, bug_group.y,
                                  bug_group.r, bug_group.g, bug_group.b);
+
+    // GAMBAR BUG TRIANGLE 
+    shader.use();
+    glUniform3f(glGetUniformLocation(shader.id(), "uColor"), 
+                1.0f, 0.5f, 1.0f);
+    drawBugTriangle(bug_heading, heading_deg, aspect_fix, 0.73f); 
 
     glfwSwapBuffers(window);
     glfwPollEvents();
