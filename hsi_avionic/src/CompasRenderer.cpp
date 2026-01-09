@@ -2,12 +2,11 @@
 #include <vector>
 #include <cmath>
 
-static float deg2rad(float d) { return d * 3.1415926535f / 180.0f; }
-
 bool CompasRenderer::init(int width, int height) {
   width_ = width;
   height_ = height;
 
+  // Setup vertex and fragment shaders
   const char* vs = R"(
     #version 330 core
     layout (location = 0) in vec2 aPos;
@@ -26,13 +25,15 @@ bool CompasRenderer::init(int width, int height) {
   glGenVertexArrays(1, &vao_);
   glGenBuffers(1, &vbo_);
 
+  // Build compass ring geometry
   buildRingGeometry(0.70f, 200);
 
+  // Initialize tick mark radii (outer to inner)
   tick_outer_r_ = 0.70f;
-  tick_inner_r_90_ = 0.10f;
-  tick_inner_r_30_ = 0.08f;
-  tick_inner_r_10_ = 0.06f;
-  tick_inner_r_5_  = 0.04f;
+  tick_inner_r_90_ = 0.10f;   // 90 degree ticks
+  tick_inner_r_30_ = 0.08f;   // 30 degree ticks
+  tick_inner_r_10_ = 0.06f;   // 10 degree ticks
+  tick_inner_r_5_  = 0.04f;   // 5 degree ticks
   
   buildTicksGeometry(tick_outer_r_, tick_inner_r_90_, tick_inner_r_30_, tick_inner_r_10_, tick_inner_r_5_);
   buildCardinalMarkersGeometry(0.70f, 0.06f);
@@ -41,12 +42,16 @@ bool CompasRenderer::init(int width, int height) {
   return true;
 }
 
+/**
+ * Build circular ring geometry for compass border
+ */
 void CompasRenderer::buildRingGeometry(float radius_ndc, int segments) {
   float aspect_fix = (float)height_ / (float)width_;
 
   std::vector<float> verts;
   verts.reserve((segments + 1) * 2);
 
+  // Generate circle vertices
   for (int i = 0; i < segments; i++) {
     float t = (float)i / (float)segments;
     float a = t * 2.0f * 3.1415926535f;
@@ -60,6 +65,7 @@ void CompasRenderer::buildRingGeometry(float radius_ndc, int segments) {
 
   vertex_count_ = segments;
 
+  // Upload to GPU
   glBindVertexArray(vao_);
   glBindBuffer(GL_ARRAY_BUFFER, vbo_);
   glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size() * sizeof(float)), verts.data(), GL_STATIC_DRAW);
@@ -71,6 +77,9 @@ void CompasRenderer::buildRingGeometry(float radius_ndc, int segments) {
   glBindVertexArray(0);
 }
 
+/**
+ * Build tick mark geometry for bearing intervals (90°, 30°, 10°, 5°)
+ */
 void CompasRenderer::buildTicksGeometry(float radius_ndc,
                                         float len_cardinal,
                                         float len_major, 
@@ -84,6 +93,7 @@ void CompasRenderer::buildTicksGeometry(float radius_ndc,
   v_medium.reserve(720); 
   v_minor.reserve(1440);
 
+  // Helper: Add tick line based on angle
   auto push_tick = [&](std::vector<float>& v, int deg, float len) {
     float angle = deg - heading_deg_;
     float a = angle * 3.1415926535f / 180.0f;
@@ -98,6 +108,7 @@ void CompasRenderer::buildTicksGeometry(float radius_ndc,
     v.push_back(x1); v.push_back(y1);
   };
 
+  // Generate tick marks for each degree interval
   for (int deg = 0; deg < 360; ++deg) {
     if (deg % 90 == 0) {
       push_tick(v_cardinal, deg, len_cardinal);
@@ -115,6 +126,7 @@ void CompasRenderer::buildTicksGeometry(float radius_ndc,
   medium_count_ = (int)(v_medium.size() / 2);
   minor_count_  = (int)(v_minor.size() / 2);
 
+  // Helper: Upload geometry to GPU
   auto upload = [](GLuint& vao, GLuint& vbo, const std::vector<float>& v) {
     if (vao != 0) glDeleteBuffers(1, &vbo);
     if (vao != 0) glDeleteVertexArrays(1, &vao);
@@ -139,12 +151,16 @@ void CompasRenderer::buildTicksGeometry(float radius_ndc,
   upload(minor_vao_, minor_vbo_, v_minor);
 }
 
+/**
+ * Build cardinal marker triangles (N, E, S, W)
+ */
 void CompasRenderer::buildCardinalMarkersGeometry(float radius_ndc, float size_ndc) {
   float aspect_fix = (float)height_ / (float)width_;
 
   std::vector<float> verts;
   verts.reserve(4 * 3 * 2);
 
+  // Helper: Add inward-pointing triangle at bearing
   auto add_triangle_inward = [&](float bearing_deg) {
     float angle = bearing_deg - heading_deg_;
     float a = angle * 3.1415926535f / 180.0f;
@@ -155,17 +171,21 @@ void CompasRenderer::buildCardinalMarkersGeometry(float radius_ndc, float size_n
     float cx = cos_a * radius_ndc * aspect_fix;
     float cy = sin_a * radius_ndc;
 
+    // Inward vector pointing towards compass center
     float inx = -cos_a;
     float iny = -sin_a;
 
+    // Tip vertex (pointing inward)
     float x0 = cx + inx * size_ndc * aspect_fix;
     float y0 = cy + iny * size_ndc;
 
+    // Tangent vector (perpendicular to radial direction)
     float tx = -sin_a;
     float ty = cos_a;
 
     float half = size_ndc * 0.6f;
 
+    // Base vertices
     float x1 = cx + tx * half * aspect_fix;
     float y1 = cy + ty * half;
 
@@ -175,13 +195,15 @@ void CompasRenderer::buildCardinalMarkersGeometry(float radius_ndc, float size_n
     verts.insert(verts.end(), {x0, y0, x1, y1, x2, y2});
   };
 
-  add_triangle_inward(0.0f);    // N
-  add_triangle_inward(90.0f);   // E
-  add_triangle_inward(180.0f);  // S
-  add_triangle_inward(270.0f);  // W
+  // Add triangles for N, E, S, W
+  add_triangle_inward(0.0f);    // North
+  add_triangle_inward(90.0f);   // East
+  add_triangle_inward(180.0f);  // South
+  add_triangle_inward(270.0f);  // West
 
   markers_vertex_count_ = (int)(verts.size() / 2);
 
+  // Upload to GPU
   if (markers_vao_ != 0) glDeleteBuffers(1, &markers_vbo_);
   if (markers_vao_ != 0) glDeleteVertexArrays(1, &markers_vao_);
 
@@ -199,17 +221,20 @@ void CompasRenderer::buildCardinalMarkersGeometry(float radius_ndc, float size_n
   glBindVertexArray(0);
 }
 
+/**
+ * Build heading indicator arrow (yellow triangle at top)
+ */
 void CompasRenderer::buildHeadingIndicatorGeometry() {
   float aspect_fix = (float)height_ / (float)width_;
   
   std::vector<float> verts;
   
-  // Parameter untuk penanda heading
-  float indicator_y = 0.77f;  // Posisi Y
-  float arrow_height = 0.12f;  // Tinggi panah
-  float arrow_width = 0.06f;   // Lebar panah
+  // Heading indicator parameters
+  float indicator_y = 0.77f;    // Y position
+  float arrow_height = 0.12f;   // Arrow height
+  float arrow_width = 0.06f;    // Arrow width
   
-  // Segitiga pointing down (panah utama)
+  // Triangle vertices (pointing downward)
   float x_center = 0.0f;
   float x_left = -arrow_width * aspect_fix;
   float x_right = arrow_width * aspect_fix;
@@ -217,7 +242,6 @@ void CompasRenderer::buildHeadingIndicatorGeometry() {
   float y_top = indicator_y;
   float y_bottom = indicator_y - arrow_height;
   
-  // Vertex segitiga
   verts.push_back(x_center);
   verts.push_back(y_bottom);
   verts.push_back(x_left);
@@ -227,6 +251,7 @@ void CompasRenderer::buildHeadingIndicatorGeometry() {
   
   heading_indicator_vertex_count_ = 3;
   
+  // Upload to GPU
   if (heading_indicator_vao_ != 0) glDeleteBuffers(1, &heading_indicator_vbo_);
   if (heading_indicator_vao_ != 0) glDeleteVertexArrays(1, &heading_indicator_vao_);
   
@@ -244,6 +269,7 @@ void CompasRenderer::buildHeadingIndicatorGeometry() {
   glBindVertexArray(0);
 }
 
+// Render compass outer ring (white circle)
 void CompasRenderer::drawRing() {
   shader_.use();
   glBindVertexArray(vao_);
@@ -257,26 +283,30 @@ void CompasRenderer::drawRing() {
   glBindVertexArray(0);
 }
 
+// Render all tick marks (90°, 30°, 10°, 5°)
 void CompasRenderer::drawTicks() {
   buildTicksGeometry(tick_outer_r_, tick_inner_r_90_, tick_inner_r_30_, tick_inner_r_10_, tick_inner_r_5_);
 
   shader_.use();
-
   GLint loc = glGetUniformLocation(shader_.id(), "uColor");
   glUniform3f(loc, 1.0f, 1.0f, 1.0f);
 
+  // Draw 90 degree ticks (thickest)
   glBindVertexArray(cardinal_vao_);
   glLineWidth(5.0f);
   glDrawArrays(GL_LINES, 0, cardinal_count_);
 
+  // Draw 30 degree ticks
   glBindVertexArray(major_vao_);
   glLineWidth(3.5f);
   glDrawArrays(GL_LINES, 0, major_count_);
 
+  // Draw 10 degree ticks
   glBindVertexArray(medium_vao_);
   glLineWidth(2.0f);
   glDrawArrays(GL_LINES, 0, medium_count_);
 
+  // Draw 5 degree ticks (thinnest)
   glBindVertexArray(minor_vao_);
   glLineWidth(1.0f);
   glDrawArrays(GL_LINES, 0, minor_count_);
@@ -284,6 +314,7 @@ void CompasRenderer::drawTicks() {
   glBindVertexArray(0);
 }
 
+// Render cardinal marker triangles (N, E, S, W)
 void CompasRenderer::drawCardinalMarkers() {
   buildCardinalMarkersGeometry(0.70f, 0.06f);
 
@@ -298,6 +329,7 @@ void CompasRenderer::drawCardinalMarkers() {
   glBindVertexArray(0);
 }
 
+// Render heading indicator arrow at top (yellow)
 void CompasRenderer::drawHeadingIndicator() {
   shader_.use();
   glBindVertexArray(heading_indicator_vao_);
@@ -310,40 +342,37 @@ void CompasRenderer::drawHeadingIndicator() {
   glBindVertexArray(0);
 }
 
-
+/**
+ * Draw bug triangle (magenta) indicating desired heading
+ */
 void CompasRenderer::drawBugTriangle(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
-  // Hitung posisi center segitiga dengan cara yang sama seperti drawTextAtBearingRadial
   float rotated_bearing = bearing_deg + heading_deg;
   float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
   
-  // Posisi center segitiga
+  // Center position on compass circle
   float cx = std::sin(angle_rad) * radius;
   float cy = std::cos(angle_rad) * radius;
   cx *= aspect_fix;
 
-  // Hitung orientasi ujung lancip (pointing inward)
-  // Vektor inward pointing ke center (berlawanan dengan posisi)
+  // Inward pointing vector (towards compass center)
   float inx = -std::sin(angle_rad);
   float iny = -std::cos(angle_rad);
 
-  // Ukuran segitiga
   float tri_size = 0.10f;
   
-  // Tip segitiga (pointing inward ke center)
+  // Tip vertex (pointing inward)
   float x0 = cx + inx * tri_size * aspect_fix;
   float y0 = cy + iny * tri_size;
 
-  // Vektor tangent (perpendicular ke arah inward, diputar 90 derajat)
+  // Tangent vector (perpendicular)
   float tx = -iny;
   float ty = inx;
-
   float half = tri_size * 0.6f;
 
-  // Bottom left vertex
+  // Base vertices
   float x1 = cx + tx * half * aspect_fix;
   float y1 = cy + ty * half;
 
-  // Bottom right vertex
   float x2 = cx - tx * half * aspect_fix;
   float y2 = cy - ty * half;
 
@@ -367,87 +396,75 @@ void CompasRenderer::drawBugTriangle(float bearing_deg, float heading_deg, float
   glDeleteVertexArrays(1, &VAO);
 }
 
-// ARROW DOUBLE (untuk waypoint hijau/green)
+/**
+ * Draw double-line waypoint arrow (green) pointing to destination
+ * Double line indicates primary navigation waypoint
+ */
 void CompasRenderer::drawWaypointArrowDouble(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
   float rotated_bearing = bearing_deg + heading_deg;
   float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
   
+  // Arrow start position (opposite direction)
   float start_radius = -0.50f;
   float sx = std::sin(angle_rad) * start_radius;
   float sy = std::cos(angle_rad) * start_radius;
   sx *= aspect_fix;
 
+  // Arrow end position (on compass circle)
   float end_radius = radius;
   float ex = std::sin(angle_rad) * end_radius;
   float ey = std::cos(angle_rad) * end_radius;
   ex *= aspect_fix;
 
+  // Direction vectors
   float outx = std::sin(angle_rad);
   float outy = std::cos(angle_rad);
 
   float tx = outy;
   float ty = -outx;
 
-  // Ukuran kepala panah
+  // Arrow head dimensions
   float arrow_head_length = 0.08f;
   float arrow_head_width = 0.04f;
 
-  // Base kepala panah (mundur dari tip)
+  // Arrow head base position
   float base_x = ex - outx * arrow_head_length * aspect_fix;
   float base_y = ey - outy * arrow_head_length;
 
-  // GARIS DOUBLE BERHENTI DI BASE (bukan di tip)
+  // Double line separation
   float line_offset = 0.015f;
   
-  // Garis 1 (atas)
+  // Top line (from start to base)
   float sx1 = sx + tx * line_offset * aspect_fix;
   float sy1 = sy + ty * line_offset;
-  float ex1 = base_x + tx * line_offset * aspect_fix;  // Berhenti di base
+  float ex1 = base_x + tx * line_offset * aspect_fix;
   float ey1 = base_y + ty * line_offset;
   
-  // Garis 2 (bawah)
+  // Bottom line (from start to base)
   float sx2 = sx - tx * line_offset * aspect_fix;
   float sy2 = sy - ty * line_offset;
-  float ex2 = base_x - tx * line_offset * aspect_fix;  // Berhenti di base
+  float ex2 = base_x - tx * line_offset * aspect_fix;
   float ey2 = base_y - ty * line_offset;
 
-  // Titik ujung panah
+  // Arrow tip
   float tip_x = ex;
   float tip_y = ey;
 
-  // Left wing
+  // Arrow head wings
   float left_x = base_x + tx * arrow_head_width * aspect_fix;
   float left_y = base_y + ty * arrow_head_width;
 
-  // Right wing
   float right_x = base_x - tx * arrow_head_width * aspect_fix;
   float right_y = base_y - ty * arrow_head_width;
 
-  // Vertices: garis double (berhenti di base) + kepala panah
+  // Construct vertices: double lines + arrow head
   float vertices[] = {
-    // Garis double line 1 (atas) - dari start ke BASE
-    sx1, sy1,
-    ex1, ey1,
-    
-    // Garis double line 2 (bawah) - dari start ke BASE
-    sx2, sy2,
-    ex2, ey2,
-    
-    // Kepala panah: base -> left_wing
-    base_x, base_y,
-    left_x, left_y,
-    
-    // left_wing -> tip
-    left_x, left_y,
-    tip_x, tip_y,
-    
-    // tip -> right_wing
-    tip_x, tip_y,
-    right_x, right_y,
-    
-    // right_wing -> base
-    right_x, right_y,
-    base_x, base_y
+    sx1, sy1, ex1, ey1,
+    sx2, sy2, ex2, ey2,
+    base_x, base_y, left_x, left_y,
+    left_x, left_y, tip_x, tip_y,
+    tip_x, tip_y, right_x, right_y,
+    right_x, right_y, base_x, base_y
   };
 
   GLuint VAO, VBO;
@@ -462,74 +479,65 @@ void CompasRenderer::drawWaypointArrowDouble(float bearing_deg, float heading_de
   glEnableVertexAttribArray(0);
 
   glLineWidth(3.5f);
-  glDrawArrays(GL_LINES, 0, 12);  // 12 vertices = 6 garis
+  glDrawArrays(GL_LINES, 0, 12);
   
   glDeleteBuffers(1, &VBO);
   glDeleteVertexArrays(1, &VAO);
 }
 
-// ARROW SINGLE (untuk waypoint kuning/yellow)
+/**
+ * Draw single-line waypoint arrow (yellow) pointing to destination
+ * Single line indicates secondary navigation waypoint
+ */
 void CompasRenderer::drawWaypointArrowSingle(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
   float rotated_bearing = bearing_deg + heading_deg;
   float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
   
-  float start_radius = - 0.50f;
+  // Arrow start position (opposite direction)
+  float start_radius = -0.50f;
   float sx = std::sin(angle_rad) * start_radius;
   float sy = std::cos(angle_rad) * start_radius;
   sx *= aspect_fix;
 
+  // Arrow end position (on compass circle)
   float end_radius = radius;
   float ex = std::sin(angle_rad) * end_radius;
   float ey = std::cos(angle_rad) * end_radius;
   ex *= aspect_fix;
 
+  // Direction vectors
   float outx = std::sin(angle_rad);
   float outy = std::cos(angle_rad);
 
   float tx = outy;
   float ty = -outx;
 
-  // Ukuran kepala panah
+  // Arrow head dimensions
   float arrow_head_length = 0.08f;
   float arrow_head_width = 0.04f;
 
-  // Base kepala panah (mundur dari tip)
+  // Arrow head base position
   float base_x = ex - outx * arrow_head_length * aspect_fix;
   float base_y = ey - outy * arrow_head_length;
 
-  // Titik ujung panah
+  // Arrow tip
   float tip_x = ex;
   float tip_y = ey;
 
-  // Left wing
+  // Arrow head wings
   float left_x = base_x + tx * arrow_head_width * aspect_fix;
   float left_y = base_y + ty * arrow_head_width;
 
-  // Right wing
   float right_x = base_x - tx * arrow_head_width * aspect_fix;
   float right_y = base_y - ty * arrow_head_width;
 
-  // Vertices: 1 garis single (berhenti di base) + kepala panah
+  // Construct vertices: single line + arrow head
   float vertices[] = {
-    // Garis single - dari start ke BASE (bukan ke tip)
-    sx, sy,
-    base_x, base_y,
-    
-    // Kepala panah: base -> left_wing
-    base_x, base_y,
-    left_x, left_y,
-    
-    // left_wing -> tip
-    left_x, left_y,
-    tip_x, tip_y,
-    
-    // tip -> right_wing
-    tip_x, tip_y,
-    right_x, right_y,
-    
-    // right_wing -> base
-    right_x, right_y,
-    base_x, base_y
+    sx, sy, base_x, base_y,
+    base_x, base_y, left_x, left_y,
+    left_x, left_y, tip_x, tip_y,
+    tip_x, tip_y, right_x, right_y,
+    right_x, right_y, base_x, base_y
   };
 
   GLuint VAO, VBO;
@@ -544,82 +552,86 @@ void CompasRenderer::drawWaypointArrowSingle(float bearing_deg, float heading_de
   glEnableVertexAttribArray(0);
 
   glLineWidth(4.0f);
-  glDrawArrays(GL_LINES, 0, 10);  // 10 vertices = 5 garis
+  glDrawArrays(GL_LINES, 0, 10);
   
   glDeleteBuffers(1, &VBO);
   glDeleteVertexArrays(1, &VAO);
 }
 
+/**
+ * Draw aircraft symbol (gray) at center of compass
+ * Represents current aircraft heading and position
+ */
 void CompasRenderer::drawAircraftSymbol(float aspect_fix) {
-  // Ukuran pesawat - LEBIH RAMPING DAN PANJANG
-  float nose_y = 0.30f;           // Ujung hidung (lebih tinggi)
-  float cockpit_y = 0.20f;        // Cockpit
-  float wing_front_y = 0.08f;     // Depan sayap
-  float wing_back_y = -0.02f;     // Belakang sayap
-  float body_mid_y = -0.12f;      // Tengah badan
-  float tail_wing_y = -0.16f;     // Ekor horizontal
-  float tail_end_y = -0.24f;      // Ujung ekor vertikal
+  // Aircraft dimensions (sleek and elongated design)
+  float nose_y = 0.30f;         // Nose tip
+  float cockpit_y = 0.20f;      // Cockpit base
+  float wing_front_y = 0.08f;   // Front edge of wings
+  float wing_back_y = -0.02f;   // Back edge of wings
+  float body_mid_y = -0.12f;    // Fuselage middle
+  float tail_wing_y = -0.16f;   // Horizontal stabilizer
+  float tail_end_y = -0.24f;    // Vertical stabilizer
   
-  float cockpit_w = 0.040f;       // Lebar cockpit (lebih ramping)
-  float body_w = 0.048f;          // Lebar badan (lebih ramping)
-  float wing_w = 0.50f;           // Lebar sayap (LEBIH PANJANG)
-  float wing_back_w = 0.58f;      // Lebar belakang sayap
-  float tail_wing_w = 0.12f;      // Lebar ekor horizontal (LEBIH PANJANG)
-  float tail_end_w = 0.26f;       // Lebar ujung ekor horizontal
-  float tail_vert_w = 0.040f;     // Lebar ekor vertikal (diperbesar)
+  float cockpit_w = 0.040f;     // Cockpit width (slender)
+  float body_w = 0.048f;        // Fuselage width (slender)
+  float wing_w = 0.50f;         // Wing span (elongated)
+  float wing_back_w = 0.58f;    // Back wing span
+  float tail_wing_w = 0.12f;    // Horizontal stabilizer span
+  float tail_end_w = 0.26f;     // Vertical stabilizer width
+  float tail_vert_w = 0.040f;   // Vertical stabilizer thickness
   
   std::vector<float> vertices = {
-    // === NOSE (Hidung lancip dengan lengkungan halus) ===
+    // === NOSE (pointed with smooth curve) ===
     0.0f, nose_y,
     -cockpit_w * 0.6f * aspect_fix, nose_y - 0.04f,
     -cockpit_w * aspect_fix, cockpit_y,
     
-    // === BODY KIRI (dari cockpit ke wing) ===
+    // === LEFT BODY (cockpit to wing) ===
     -body_w * 0.9f * aspect_fix, cockpit_y - 0.02f,
     -body_w * aspect_fix, wing_front_y + 0.04f,
     
-    // === WING KIRI (PANJANG) ===
+    // === LEFT WING ===
     -wing_w * 0.5f * aspect_fix, wing_front_y,
     -wing_back_w * 0.5f * aspect_fix, wing_back_y,
     
-    // === BODY KIRI (dari wing ke tail wing) ===
+    // === LEFT BODY (wing to tail) ===
     -body_w * aspect_fix, wing_back_y,
     -body_w * aspect_fix, body_mid_y,
     -body_w * 0.85f * aspect_fix, tail_wing_y,
     
-    // === TAIL WING KIRI (Ekor horizontal PANJANG) ===
+    // === LEFT TAIL WING (horizontal stabilizer) ===
     -tail_wing_w * 0.6f * aspect_fix, tail_wing_y,
     -tail_end_w * 0.6f * aspect_fix, tail_end_y,
     
-    // === TAIL VERTIKAL KIRI (lancip ke DALAM) ===
+    // === LEFT VERTICAL STABILIZER (V-notch inward) ===
     -tail_vert_w * aspect_fix, tail_end_y,
-    -tail_vert_w * 0.4f * aspect_fix, tail_end_y + 0.03f,  // Naik ke dalam
+    -tail_vert_w * 0.4f * aspect_fix, tail_end_y + 0.03f,
     
-    // === TAIL VERTIKAL TENGAH (LANCIP KE DALAM - V shape terbalik) ===
-    0.0f, tail_end_y - 0.03f,  // Puncak V di dalam (lebih tinggi dari tail_end_y)
+    // === CENTER VERTICAL STABILIZER (V-notch apex) ===
+    0.0f, tail_end_y - 0.03f,
     
-    // === TAIL VERTIKAL KANAN (lancip ke DALAM) ===
-    tail_vert_w * 0.4f * aspect_fix, tail_end_y + 0.03f,  // Naik ke dalam
+    // === RIGHT VERTICAL STABILIZER (V-notch inward) ===
+    tail_vert_w * 0.4f * aspect_fix, tail_end_y + 0.03f,
     tail_vert_w * aspect_fix, tail_end_y,
     
-    // === TAIL WING KANAN (Ekor horizontal PANJANG) ===
+    // === RIGHT TAIL WING (horizontal stabilizer) ===
     tail_end_w * 0.6f * aspect_fix, tail_end_y,
     tail_wing_w * 0.6f * aspect_fix, tail_wing_y,
     
-    // === BODY KANAN (dari tail wing ke wing) ===
+    // === RIGHT BODY (tail to wing) ===
     body_w * 0.85f * aspect_fix, tail_wing_y,
     body_w * aspect_fix, body_mid_y,
     body_w * aspect_fix, wing_back_y,
     
-    // === WING KANAN (PANJANG) ===
+    // === RIGHT WING ===
     wing_back_w * 0.5f * aspect_fix, wing_back_y,
     wing_w * 0.5f * aspect_fix, wing_front_y,
     
-    // === BODY KANAN (dari wing ke cockpit) ===
-    body_w * aspect_fix, wing_front_y +  0.04f,
+    // === RIGHT BODY (wing to cockpit) ===
+    body_w * aspect_fix, wing_front_y + 0.04f,
     body_w * 0.9f * aspect_fix, cockpit_y - 0.02f,
     
-    // === NOSE KANAN (lengkungan halus) ===
+    // === NOSE (pointed with smooth curve) ===
     cockpit_w * aspect_fix, cockpit_y,
     cockpit_w * 0.6f * aspect_fix, nose_y - 0.04f,
     0.0f, nose_y
@@ -646,7 +658,3 @@ void CompasRenderer::drawAircraftSymbol(float aspect_fix) {
   glDeleteBuffers(1, &VBO);
   glDeleteVertexArrays(1, &VAO);
 }
-
-
-
-

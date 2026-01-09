@@ -14,6 +14,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glfw)
 
+# GLAD Library
 add_library(glad STATIC
   lib/glad/src/glad.c
 )
@@ -22,12 +23,41 @@ target_include_directories(glad PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/glad/include
 )
 
-add_executable(hsi_avionic
+# Source files
+set(SOURCE_FILES
   src/main.cpp
   src/Shader.cpp
   src/CompasRenderer.cpp
   src/TtfTextRenderer.cpp
+  src/HsiRenderer.cpp
+  src/HsiUiRenderer.cpp
 )
 
-target_include_directories(hsi_avionic PRIVATE include lib)
+# Header files
+set(HEADER_FILES
+  include/gfx/Shader.hpp
+  include/gfx/TtfTextRenderer.hpp
+  include/gfx/HsiRenderer.hpp
+  include/compas/CompasRenderer.hpp
+  include/ui/HsiUiRenderer.hpp
+  include/data/HsiData.hpp
+)
+
+# Create executable
+add_executable(hsi_avionic ${SOURCE_FILES} ${HEADER_FILES})
+
+# Include directories
+target_include_directories(hsi_avionic PRIVATE 
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/lib
+)
+
+# Link libraries
 target_link_libraries(hsi_avionic PRIVATE glfw glad)
+
+# Optional: Enable compiler warnings
+if(MSVC)
+  target_compile_options(hsi_avionic PRIVATE /W4)
+else()
+  target_compile_options(hsi_avionic PRIVATE -Wall -Wextra -Wpedantic)
+endif()
