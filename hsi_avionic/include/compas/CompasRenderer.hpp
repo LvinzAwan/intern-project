@@ -18,7 +18,20 @@ public:
   void drawBugTriangle(float bearing_deg, float heading_deg, float aspect_fix, float radius);
   void drawWaypointArrowDouble(float bearing_deg, float heading_deg, float aspect_fix, float radius);
   void drawWaypointArrowSingle(float bearing_deg, float heading_deg, float aspect_fix, float radius);
+  void drawWaypointCircles(float bearing_deg, float heading_deg, float aspect_fix, float radius,
+                          float circle_spacing = 0.045f, float circle_radius = 0.015f,
+                          float circle_opacity = 0.5f, float line_width = 1.5f);
   void drawAircraftSymbol(float aspect_fix);
+
+  /**
+   * Draw perpendicular line at waypoint circle
+   */
+  void drawPerpendicularLine(float bearing_deg, float heading_deg, float aspect_fix,
+                            float circle_spacing, float line_length = 0.15f, float line_width = 3.5f);
+
+  void updatePerpLineOffset(float delta);
+  void setPerpLineOffset(float offset);
+  float getPerpLineOffset() const { return perp_line_offset_; }
 
 private:
   void buildRingGeometry(float radius_ndc, int segments);
@@ -70,4 +83,7 @@ private:
   float tick_inner_r_30_ = 0.08f;
   float tick_inner_r_10_ = 0.06f;
   float tick_inner_r_5_  = 0.04f;
+
+  // Perpendicular line parameters
+  float perp_line_offset_ = 0.0f;    // Current offset position (slider)
 };

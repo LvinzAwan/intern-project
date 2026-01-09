@@ -24,7 +24,20 @@ namespace {
   const float R_WHITE = 1.0f, G_WHITE = 1.0f, B_WHITE = 1.0f;
   const float R_GREEN = 0.0f, G_GREEN = 1.0f, B_GREEN = 0.0f;
   const float R_GRAY = 0.5f, G_GRAY = 0.5f, B_GRAY = 0.5f;
-  const float R_MAGENTA = 1.0f, G_MAGENTA = 0.0f, B_MAGENTA = 1.0f; // Perbaikan warna magenta
+  const float R_MAGENTA = 1.0f, G_MAGENTA = 0.0f, B_MAGENTA = 1.0f; 
+}
+
+namespace CircleConstants {
+  const float CIRCLE_SPACING = 0.15f;   
+  const float CIRCLE_RADIUS = 0.025f;    
+  const float CIRCLE_OPACITY = 0.7f;   
+  const float CIRCLE_LINE_WIDTH = 2.0f;  
+}
+
+namespace PerpLineConstants {
+  const float LINE_LENGTH = 0.15f;      
+  const float LINE_WIDTH = 6.0f;          
+  const float LINE_SENSITIVITY = 0.008f;  
 }
 
 namespace DataConstants {
@@ -89,7 +102,8 @@ bool initializeFonts(TtfTextRenderer fonts[], const char* paths[], const float s
 void handleInput(GLFWwindow* window, float& heading_deg, float& bug_heading,
                  float& wp_left_bearing, float& wp_right_bearing,
                  CompasRenderer& compas, float delta_time) {
-  // Heading control
+  
+  // Heading adjustment (LEFT/RIGHT arrows)
   if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
     heading_deg += 90.0f * delta_time;
     if (heading_deg >= 360.0f) heading_deg -= 360.0f;
@@ -101,7 +115,7 @@ void handleInput(GLFWwindow* window, float& heading_deg, float& bug_heading,
     compas.setHeadingDeg(heading_deg);
   }
 
-  // Bug heading control
+  // Bug heading adjustment (UP/DOWN arrows)
   if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
     bug_heading += 90.0f * delta_time;
     if (bug_heading >= 360.0f) bug_heading -= 360.0f;
@@ -111,7 +125,7 @@ void handleInput(GLFWwindow* window, float& heading_deg, float& bug_heading,
     if (bug_heading < 0.0f) bug_heading += 360.0f;
   }
 
-  // Waypoint left bearing control
+  // Left waypoint bearing adjustment (A/D keys)
   if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
     wp_left_bearing += 90.0f * delta_time;
     if (wp_left_bearing >= 360.0f) wp_left_bearing -= 360.0f;
@@ -121,7 +135,7 @@ void handleInput(GLFWwindow* window, float& heading_deg, float& bug_heading,
     if (wp_left_bearing < 0.0f) wp_left_bearing += 360.0f;
   }
 
-  // Waypoint right bearing control
+  // Right waypoint bearing adjustment (W/S keys)
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
     wp_right_bearing += 90.0f * delta_time;
     if (wp_right_bearing >= 360.0f) wp_right_bearing -= 360.0f;
@@ -131,6 +145,15 @@ void handleInput(GLFWwindow* window, float& heading_deg, float& bug_heading,
     if (wp_right_bearing < 0.0f) wp_right_bearing += 360.0f;
   }
 
+  // Perpendicular line slider control with keyboard 1 and 2
+  if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+    compas.updatePerpLineOffset(-PerpLineConstants::LINE_SENSITIVITY);
+  }
+  if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+    compas.updatePerpLineOffset(PerpLineConstants::LINE_SENSITIVITY);
+  }
+
+  // Exit application
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
     glfwSetWindowShouldClose(window, GLFW_TRUE);
   }
@@ -326,7 +349,7 @@ int main() {
     R_MAGENTA, G_MAGENTA, B_MAGENTA
   };
 
-  // Setup shader
+  // Setup shader untuk mendukung color dan alpha
   Shader shader;
   const char* vs = R"(#version 330 core
     layout (location = 0) in vec2 aPos;
@@ -334,10 +357,17 @@ int main() {
   )";
   const char* fs = R"(#version 330 core
     uniform vec3 uColor;
+    uniform float uAlpha;
     out vec4 FragColor;
-    void main() { FragColor = vec4(uColor, 1.0); }
+    void main() { 
+      FragColor = vec4(uColor, uAlpha); 
+    }
   )";
   shader.build(vs, fs);
+
+  // Enable blending untuk alpha transparency
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   glViewport(0, 0, kWidth, kHeight);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -372,15 +402,42 @@ int main() {
     ui_renderer.renderWaypointRight(wp_right, kRightOffset);
     ui_renderer.renderBugGroup(bug);
 
-    // Draw waypoint arrows
+    // Render navigation overlays on compass
     shader.use();
+    
+    // Left waypoint arrow (single, yellow)
     glUniform3f(glGetUniformLocation(shader.id(), "uColor"), R_YELLOW, G_YELLOW, B_YELLOW);
+    glUniform1f(glGetUniformLocation(shader.id(), "uAlpha"), 1.0f);
     compas.drawWaypointArrowSingle(wp_left_bearing, heading_deg, kAspectFix, 0.50f);
     
+    // Draw circles along yellow arrow
+    glUniform3f(glGetUniformLocation(shader.id(), "uColor"), R_YELLOW, G_YELLOW, B_YELLOW);
+    glUniform1f(glGetUniformLocation(shader.id(), "uAlpha"), CircleConstants::CIRCLE_OPACITY);
+    compas.drawWaypointCircles(wp_left_bearing, heading_deg, kAspectFix, 0.50f,
+                              CircleConstants::CIRCLE_SPACING,
+                              CircleConstants::CIRCLE_RADIUS,
+                              CircleConstants::CIRCLE_OPACITY,
+                              CircleConstants::CIRCLE_LINE_WIDTH);
+    
+    // Draw perpendicular line
+    shader.use();
+    glUniform3f(glGetUniformLocation(shader.id(), "uColor"), 1.0f, 1.0f, 0.0f);
+    glUniform1f(glGetUniformLocation(shader.id(), "uAlpha"), 1.0f);  
+    compas.drawPerpendicularLine(wp_left_bearing, heading_deg, kAspectFix,
+                                CircleConstants::CIRCLE_SPACING,
+                                PerpLineConstants::LINE_LENGTH,
+                                PerpLineConstants::LINE_WIDTH);
+
+    // Right waypoint arrow (double, green)
+    shader.use();
     glUniform3f(glGetUniformLocation(shader.id(), "uColor"), R_GREEN, G_GREEN, B_GREEN);
+    glUniform1f(glGetUniformLocation(shader.id(), "uAlpha"), 1.0f);
     compas.drawWaypointArrowDouble(wp_right_bearing, heading_deg, kAspectFix, 0.50f);
 
+    // Bug heading indicator (magenta triangle)
+    shader.use();
     glUniform3f(glGetUniformLocation(shader.id(), "uColor"), R_MAGENTA, G_MAGENTA, B_MAGENTA);
+    glUniform1f(glGetUniformLocation(shader.id(), "uAlpha"), 1.0f);
     compas.drawBugTriangle(bug_heading, heading_deg, kAspectFix, 0.73f);
 
     glfwSwapBuffers(window);

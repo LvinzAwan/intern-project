@@ -559,6 +559,180 @@ void CompasRenderer::drawWaypointArrowSingle(float bearing_deg, float heading_de
 }
 
 /**
+ * Draw small circles perpendicular to waypoint arrow
+ * 7 circles positioned perpendicular (90 degrees) to the yellow waypoint arrow
+ * 
+ * @param bearing_deg Target bearing direction
+ * @param heading_deg Current heading
+ * @param aspect_fix Aspect ratio correction
+ * @param radius Circle positioning radius
+ * @param circle_spacing Distance between circles
+ * @param circle_radius Size of each circle
+ * @param circle_opacity Alpha transparency (0.0-1.0)
+ * @param line_width Ketebalan garis circle (default: 1.5f)
+ */
+void CompasRenderer::drawWaypointCircles(float bearing_deg, float heading_deg, float aspect_fix, 
+                                         float radius, float circle_spacing, float circle_radius,
+                                         float circle_opacity, float line_width) {
+  float rotated_bearing = bearing_deg + heading_deg;
+  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
+  
+  // Arrow direction
+  float outx = std::sin(angle_rad);
+  float outy = std::cos(angle_rad);
+
+  // Perpendicular direction (90 degrees to arrow)
+  float perpx = std::cos(angle_rad);
+  float perpy = -std::sin(angle_rad);
+
+  // Arrow center position
+  float center_radius = (radius - 0.50f) / 2.0f;  // Midpoint between start and end
+  float cx = std::sin(angle_rad) * center_radius;
+  float cy = std::cos(angle_rad) * center_radius;
+  cx *= aspect_fix;
+
+  // Circle parameters
+  const int NUM_CIRCLES = 7;
+  const int CIRCLE_SEGMENTS = 12;        // Segments per circle
+
+  // Draw circles perpendicular to arrow (spanning left and right)
+  for (int i = -(NUM_CIRCLES / 2); i <= (NUM_CIRCLES / 2); ++i) {
+    // Position along perpendicular axis
+    float offset = (float)i * circle_spacing;
+    
+    float circle_x = cx + perpx * offset * aspect_fix;
+    float circle_y = cy + perpy * offset;
+
+    // Generate circle vertices
+    std::vector<float> circle_verts;
+    circle_verts.reserve((CIRCLE_SEGMENTS + 1) * 2);
+
+    for (int j = 0; j < CIRCLE_SEGMENTS; ++j) {
+      float angle = (float)j / (float)CIRCLE_SEGMENTS * 2.0f * 3.1415926535f;
+      float x = circle_x + std::cos(angle) * circle_radius * aspect_fix;
+      float y = circle_y + std::sin(angle) * circle_radius;
+      circle_verts.push_back(x);
+      circle_verts.push_back(y);
+    }
+
+    // Upload and render circle
+    GLuint VAO, VBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(circle_verts.size() * sizeof(float)), 
+                 circle_verts.data(), GL_STATIC_DRAW);
+    
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Set line width dan opacity
+    glLineWidth(line_width);
+    glDrawArrays(GL_LINE_LOOP, 0, CIRCLE_SEGMENTS);
+    
+    glDeleteBuffers(1, &VBO);
+    glDeleteVertexArrays(1, &VAO);
+  }
+}
+
+/**
+ * Draw perpendicular line inside circle array
+ * Line is perpendicular (90 degrees) to waypoint arrow
+ * Line moves along the circle array with keyboard control
+ * 
+ * @param bearing_deg Target bearing direction
+ * @param heading_deg Current heading
+ * @param aspect_fix Aspect ratio correction
+ * @param circle_spacing Distance between circles
+ * @param line_length Length of perpendicular line (adjustable)
+ * @param line_width Thickness of line (adjustable)
+ */
+void CompasRenderer::drawPerpendicularLine(float bearing_deg, float heading_deg, float aspect_fix,
+                                          float circle_spacing, float line_length, float line_width) {
+  float rotated_bearing = bearing_deg + heading_deg;
+  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
+  
+  // Arrow direction (along the arrow line)
+  float outx = std::sin(angle_rad);
+  float outy = std::cos(angle_rad);
+
+  // Perpendicular direction (90 degrees to arrow - left/right direction)
+  float perpx = std::cos(angle_rad);
+  float perpy = -std::sin(angle_rad);
+
+  // Arrow center position
+  float center_radius = 0.0f;
+  float cx = std::sin(angle_rad) * center_radius;
+  float cy = std::cos(angle_rad) * center_radius;
+  cx *= aspect_fix;
+
+  // Calculate max offset based on circle spacing (7 circles)
+  const int NUM_CIRCLES = 7;
+  float max_offset = (NUM_CIRCLES / 2.0f) * circle_spacing;
+
+  // Clamp offset to max allowed
+  float clamped_offset = perp_line_offset_;
+  if (clamped_offset > max_offset) {
+    clamped_offset = max_offset;
+  }
+  if (clamped_offset < -max_offset) {
+    clamped_offset = -max_offset;
+  }
+
+  // Line center position (along perpendicular direction at current offset)
+  float line_center_x = cx + perpx * clamped_offset * aspect_fix;
+  float line_center_y = cy + perpy * clamped_offset;
+
+  // Line extends up and down (along arrow direction)
+  float start_x = line_center_x - outx * (line_length / 2.0f) * aspect_fix;
+  float start_y = line_center_y - outy * (line_length / 2.0f);
+  
+  float end_x = line_center_x + outx * (line_length / 2.0f) * aspect_fix;
+  float end_y = line_center_y + outy * (line_length / 2.0f);
+
+  // Create line vertices
+  float vertices[] = {
+    start_x, start_y,
+    end_x, end_y
+  };
+
+  GLuint VAO, VBO;
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  
+  glBindVertexArray(VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  glLineWidth(line_width);
+  glDrawArrays(GL_LINES, 0, 2);
+  
+  glDeleteBuffers(1, &VBO);
+  glDeleteVertexArrays(1, &VAO);
+}
+
+/**
+ * Update perpendicular line offset (slider movement)
+ * Positive = right, Negative = left
+ * Bergerak di antara circle array
+ */
+void CompasRenderer::updatePerpLineOffset(float delta) {
+  perp_line_offset_ += delta;
+}
+
+/**
+ * Set perpendicular line to absolute position
+ */
+void CompasRenderer::setPerpLineOffset(float offset) {
+  perp_line_offset_ = offset;
+}
+
+/**
  * Draw aircraft symbol (gray) at center of compass
  * Represents current aircraft heading and position
  */
