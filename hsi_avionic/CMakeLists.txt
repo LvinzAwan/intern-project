@@ -43,7 +43,16 @@ set(HEADER_FILES
   include/data/HsiData.hpp
 )
 
-# Create executable
+# ==================== COMPILER OPTIONS ====================
+add_compile_options(-Wno-unused-variable)
+
+if(MSVC)
+  target_compile_options(hsi_avionic PRIVATE /W4)
+else()
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# ==================== CREATE EXECUTABLE ====================
 add_executable(hsi_avionic ${SOURCE_FILES} ${HEADER_FILES})
 
 # Include directories
@@ -54,10 +63,3 @@ target_include_directories(hsi_avionic PRIVATE
 
 # Link libraries
 target_link_libraries(hsi_avionic PRIVATE glfw glad)
-
-# Optional: Enable compiler warnings
-if(MSVC)
-  target_compile_options(hsi_avionic PRIVATE /W4)
-else()
-  target_compile_options(hsi_avionic PRIVATE -Wall -Wextra -Wpedantic)
-endif()

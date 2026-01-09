@@ -16,8 +16,8 @@ namespace {
   const float kAspectFix = (float)kHeight / (float)kWidth;
   const float kCardinalRadius = 0.55f;
   const float kNumberRadius = 0.57f;
-  const float kLeftOffset = -0.92f;
-  const float kRightOffset = 0.92f;
+  const float kLeftOffset = -0.95f;   
+  const float kRightOffset = 0.95f;
   
   // Colors
   const float R_YELLOW = 1.0f, G_YELLOW = 1.0f, B_YELLOW = 0.0f;
@@ -82,7 +82,7 @@ namespace DataConstants {
 
   // Bug indicator data
   const float BUG_X = 0.0f;
-  const float BUG_Y = -0.90f;
+  const float BUG_Y = -0.85f;
 }
 
 static void framebuffer_size_callback(GLFWwindow*, int w, int h) {
@@ -183,7 +183,7 @@ void renderCompass(CompasRenderer& compas, TtfTextRenderer& ttf_cardinal,
 }
 
 void renderHeadingDisplay(TtfTextRenderer& ttf_heading, TtfTextRenderer& ttf_label,
-                          TtfTextRenderer& ttf_symbol, float heading_deg, Shader& shader) {
+                          float heading_deg, Shader& shader) {
   shader.use();
   HsiRenderer::drawHeadingBox(0.0f, 0.82f, 0.18f, 0.10f);
 
@@ -191,11 +191,10 @@ void renderHeadingDisplay(TtfTextRenderer& ttf_heading, TtfTextRenderer& ttf_lab
   float display_heading = 360.0f - (int)heading_deg;
   if (display_heading >= 360.0f) display_heading -= 360.0f;
   snprintf(heading_str, sizeof(heading_str), "%03d", (int)display_heading);
-  ttf_heading.drawTextCenteredNDC(heading_str, 0.0f, 0.87f, R_YELLOW, G_YELLOW, B_YELLOW); // Kuning
+  ttf_heading.drawTextCenteredNDC(heading_str, 0.0f, 0.82f, R_YELLOW, G_YELLOW, B_YELLOW); 
 
-  ttf_label.drawTextCenteredNDC("HDG", -0.17f, 0.87f, R_WHITE, G_WHITE, B_WHITE);
-  ttf_symbol.drawTextCenteredNDC("o", 0.11f, 0.86f, R_WHITE, G_WHITE, B_WHITE);
-  ttf_label.drawTextCenteredNDC("M", 0.15f, 0.87f, R_WHITE, G_WHITE, B_WHITE);
+  ttf_label.drawTextCenteredNDC("HDG", -0.20f, 0.85f, R_WHITE, G_WHITE, B_WHITE);
+  ttf_label.drawTextCenteredNDC("°M", 0.17f, 0.85f, R_WHITE, G_WHITE, B_WHITE);
 }
 
 int main() {
@@ -239,20 +238,35 @@ int main() {
     return 1;
   }
 
-  // Initialize fonts
-  TtfTextRenderer fonts[7];
+  // ==================== FONT INITIALIZATION ====================
+  TtfTextRenderer fonts[10];  // TAMBAH 1 untuk bearing waypoint
   const char* font_paths[] = {
-    "../assets/fonts/DejaVuSans-Bold.ttf",
-    "../assets/fonts/DejaVuSans-Bold.ttf",
-    "../assets/fonts/DejaVuSans-Bold.ttf",
-    "../assets/fonts/DejaVuSans-Bold.ttf",
-    "../assets/fonts/DejaVuSans-Bold.ttf",
-    "../assets/fonts/ArialMdm.ttf",
-    "../assets/fonts/ArialMdm.ttf"
+    "../assets/fonts/DejaVuSans-Bold.ttf",  // 0: Cardinal
+    "../assets/fonts/DejaVuSans-Bold.ttf",  // 1: Numbers
+    "../assets/fonts/DejaVuSans-Bold.ttf",  // 2: Heading value
+    "../assets/fonts/DejaVuSans-Bold.ttf",  // 3: Heading label
+    "../assets/fonts/DejaVuSans-Bold.ttf",  // 4: Heading symbol
+    "../assets/fonts/ArialMdm.ttf",         // 5: Side info values
+    "../assets/fonts/ArialMdm.ttf",         // 6: Side info labels
+    "../assets/fonts/DejaVuSans-Bold.ttf",  // 7: Waypoint name
+    "../assets/fonts/DejaVuSans-Bold.ttf",  // 8: Waypoint bearing (BARU - BESAR)
+    "../assets/fonts/ArialMdm.ttf"          // 9: Waypoint info details
   };
-  const float font_sizes[] = {56.0f, 40.0f, 36.0f, 32.0f, 20.0f, 36.0f, 34.0f};
   
-  if (!initializeFonts(fonts, font_paths, font_sizes, 7)) {
+  const float font_sizes[] = {
+    56.0f,  // fonts[0] - Cardinal (N, E, S, W)
+    40.0f,  // fonts[1] - Numbers (30, 60, 120, ...)
+    52.0f,  // fonts[2] - Heading display (000)
+    38.0f,  // fonts[3] - Heading label (HDG, °M)
+    26.0f,  // fonts[4] - Heading symbol
+    54.0f,  // fonts[5] - Info font (IAS, ALT value) ← UBAH INI
+    48.0f,  // fonts[6] - Info label (IAS, ALT label) ← UBAH INI
+    82.0f,  // fonts[7] - Waypoint name (EDAB, EDD1)
+    64.0f,  // fonts[8] - Waypoint bearing (347°, 324°)
+    42.0f   // fonts[9] - Waypoint info
+  };
+
+  if (!initializeFonts(fonts, font_paths, font_sizes, 10)) {
     glfwDestroyWindow(window);
     glfwTerminate();
     return 1;
@@ -265,8 +279,13 @@ int main() {
   TtfTextRenderer& ttf_heading_symbol = fonts[4];
   TtfTextRenderer& ttf_info = fonts[5];
   TtfTextRenderer& ttf_info_label = fonts[6];
+  TtfTextRenderer& ttf_waypoint_name = fonts[7];
+  TtfTextRenderer& ttf_waypoint_bearing = fonts[8];  // BARU
+  TtfTextRenderer& ttf_waypoint_info = fonts[9];
 
-  HsiUiRenderer ui_renderer(ttf_info, ttf_info_label);
+  // Initialize UI renderer with all fonts
+  HsiUiRenderer ui_renderer(ttf_info, ttf_info_label,
+                            ttf_waypoint_name, ttf_waypoint_bearing, ttf_waypoint_info);
 
   // Initialize data
   float heading_deg = 0.0f;
@@ -390,14 +409,17 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     renderCompass(compas, ttf_cardinal, ttf_numbers, heading_deg);
-    renderHeadingDisplay(ttf_heading, ttf_heading_label, ttf_heading_symbol, heading_deg, shader);
+    renderHeadingDisplay(ttf_heading, ttf_heading_label, heading_deg, shader);
 
-    // Render UI elements
+    // Render side panel UI elements
     ui_renderer.renderWindGroup(wind, kLeftOffset);
     ui_renderer.renderGpsGroup(gps, kLeftOffset);
     ui_renderer.renderIasGroup(ias, kLeftOffset);
-    ui_renderer.renderCourseGroup(course, kRightOffset);
+    
+    ui_renderer.renderCogGroup(course, kRightOffset); 
+    ui_renderer.renderGsGroup(course, kRightOffset);     
     ui_renderer.renderAltGroup(alt, kRightOffset);
+    
     ui_renderer.renderWaypointLeft(wp_left, kLeftOffset);
     ui_renderer.renderWaypointRight(wp_right, kRightOffset);
     ui_renderer.renderBugGroup(bug);

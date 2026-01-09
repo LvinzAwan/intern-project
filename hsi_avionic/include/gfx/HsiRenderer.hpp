@@ -16,4 +16,4 @@ public:
   static void drawHeadingBox(float x, float y, float width, float height);
 };
 
-#endif // HSI_RENDERER_HPP
+#endif 

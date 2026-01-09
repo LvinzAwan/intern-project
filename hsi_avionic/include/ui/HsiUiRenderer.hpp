@@ -6,12 +6,15 @@
 
 class HsiUiRenderer {
 public:
-  HsiUiRenderer(TtfTextRenderer& info_font, TtfTextRenderer& info_label_font);
+  HsiUiRenderer(TtfTextRenderer& info_font, TtfTextRenderer& info_label_font,
+                TtfTextRenderer& waypoint_name_font, TtfTextRenderer& waypoint_bearing_font,
+                TtfTextRenderer& waypoint_info_font);
   
   void renderWindGroup(const WindGroup& wind, float left_offset);
   void renderGpsGroup(const GpsGroup& gps, float left_offset);
   void renderIasGroup(const IasGroup& ias, float left_offset);
-  void renderCourseGroup(const CourseGroup& course, float right_offset);
+  void renderCogGroup(const CourseGroup& course, float right_offset); 
+  void renderGsGroup(const CourseGroup& course, float right_offset);     
   void renderAltGroup(const AltGroup& alt, float right_offset);
   void renderWaypointLeft(const WaypointGroup& wp, float left_offset);
   void renderWaypointRight(const WaypointGroup& wp, float right_offset);
@@ -20,6 +23,9 @@ public:
 private:
   TtfTextRenderer& info_font_;
   TtfTextRenderer& info_label_font_;
+  TtfTextRenderer& waypoint_name_font_;
+  TtfTextRenderer& waypoint_bearing_font_;  // BARU
+  TtfTextRenderer& waypoint_info_font_;
 };
 
-#endif // HSI_UI_RENDERER_HPPs
+#endif // HSI_UI_RENDERER_HPP
