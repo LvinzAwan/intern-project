@@ -239,7 +239,7 @@ int main() {
   }
 
   // ==================== FONT INITIALIZATION ====================
-  TtfTextRenderer fonts[10];  // TAMBAH 1 untuk bearing waypoint
+  TtfTextRenderer fonts[12];  // TAMBAH 1 untuk bearing waypoint
   const char* font_paths[] = {
     "../assets/fonts/DejaVuSans-Bold.ttf",  // 0: Cardinal
     "../assets/fonts/DejaVuSans-Bold.ttf",  // 1: Numbers
@@ -250,7 +250,9 @@ int main() {
     "../assets/fonts/ArialMdm.ttf",         // 6: Side info labels
     "../assets/fonts/DejaVuSans-Bold.ttf",  // 7: Waypoint name
     "../assets/fonts/DejaVuSans-Bold.ttf",  // 8: Waypoint bearing (BARU - BESAR)
-    "../assets/fonts/ArialMdm.ttf"          // 9: Waypoint info details
+    "../assets/fonts/ArialMdm.ttf",         // 9: Waypoint info details
+    "../assets/fonts/DejaVuSans-Bold.ttf",  // 10: Info font (IAS, ALT value)
+    "../assets/fonts/DejaVuSans-Bold.ttf"   // 11: Info label (IAS, ALT label)
   };
   
   const float font_sizes[] = {
@@ -259,14 +261,16 @@ int main() {
     52.0f,  // fonts[2] - Heading display (000)
     38.0f,  // fonts[3] - Heading label (HDG, °M)
     26.0f,  // fonts[4] - Heading symbol
-    54.0f,  // fonts[5] - Info font (IAS, ALT value) ← UBAH INI
-    48.0f,  // fonts[6] - Info label (IAS, ALT label) ← UBAH INI
+    54.0f,  // fonts[5] - Info font 
+    48.0f,  // fonts[6] - Info label
     82.0f,  // fonts[7] - Waypoint name (EDAB, EDD1)
     64.0f,  // fonts[8] - Waypoint bearing (347°, 324°)
-    42.0f   // fonts[9] - Waypoint info
+    42.0f,  // fonts[9] - Waypoint info
+    84.0f,  // fonts[10] - Info font (IAS, ALT value)
+    56.0f,  // fonts[11] - Info label (IAS, ALT label)
   };
 
-  if (!initializeFonts(fonts, font_paths, font_sizes, 10)) {
+  if (!initializeFonts(fonts, font_paths, font_sizes, 12)) {
     glfwDestroyWindow(window);
     glfwTerminate();
     return 1;
@@ -280,12 +284,14 @@ int main() {
   TtfTextRenderer& ttf_info = fonts[5];
   TtfTextRenderer& ttf_info_label = fonts[6];
   TtfTextRenderer& ttf_waypoint_name = fonts[7];
-  TtfTextRenderer& ttf_waypoint_bearing = fonts[8];  // BARU
+  TtfTextRenderer& ttf_waypoint_bearing = fonts[8];  
   TtfTextRenderer& ttf_waypoint_info = fonts[9];
+  TtfTextRenderer& ttf_info_side = fonts[10];
+  TtfTextRenderer& ttf_info_label_side = fonts[11];
 
   // Initialize UI renderer with all fonts
   HsiUiRenderer ui_renderer(ttf_info, ttf_info_label,
-                            ttf_waypoint_name, ttf_waypoint_bearing, ttf_waypoint_info);
+                            ttf_waypoint_name, ttf_waypoint_bearing, ttf_waypoint_info, ttf_info_side, ttf_info_label_side);
 
   // Initialize data
   float heading_deg = 0.0f;

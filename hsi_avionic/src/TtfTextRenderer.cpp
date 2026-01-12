@@ -416,7 +416,7 @@ void TtfTextRenderer::drawTextLeftAligned(const char* text, float x, float y,
 
   if (minx > maxx) return;
 
-  float x_ndc = x + (minx * s);
+  float x_ndc = x - (minx * s);
   drawTextNDC(text, x_ndc, y, r, g, b);
 }
 

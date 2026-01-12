@@ -3,10 +3,10 @@
 
 HsiUiRenderer::HsiUiRenderer(TtfTextRenderer& info_font, TtfTextRenderer& info_label_font,
                              TtfTextRenderer& waypoint_name_font, TtfTextRenderer& waypoint_bearing_font,
-                             TtfTextRenderer& waypoint_info_font)
+                             TtfTextRenderer& waypoint_info_font, TtfTextRenderer& ttf_info_side, TtfTextRenderer& ttf_info_label_side)
   : info_font_(info_font), info_label_font_(info_label_font),
     waypoint_name_font_(waypoint_name_font), waypoint_bearing_font_(waypoint_bearing_font),
-    waypoint_info_font_(waypoint_info_font) {}
+    waypoint_info_font_(waypoint_info_font), info_side_(ttf_info_side), info_label_side_(ttf_info_label_side) {}
 
 void HsiUiRenderer::renderWindGroup(const WindGroup& wind, float left_offset) {
   char wind_str[32];
@@ -35,22 +35,22 @@ void HsiUiRenderer::renderGsGroup(const CourseGroup& course, float right_offset)
 }
 
 void HsiUiRenderer::renderIasGroup(const IasGroup& ias, float left_offset) {
-  info_label_font_.drawTextLeftAligned("IAS", left_offset, ias.y + 0.10f,
+  info_label_side_.drawTextLeftAligned("IAS", left_offset, ias.y + 0.15f,
                                        ias.label_r, ias.label_g, ias.label_b);
   
   char ias_str[32];
   snprintf(ias_str, sizeof(ias_str), "%.0f", ias.value);
-  info_font_.drawTextLeftAligned(ias_str, left_offset, ias.y,
+  info_side_.drawTextLeftAligned(ias_str, left_offset, ias.y,
                                  ias.value_r, ias.value_g, ias.value_b);
 }
 
 void HsiUiRenderer::renderAltGroup(const AltGroup& alt, float right_offset) {
-  info_label_font_.drawTextRightAligned("ALT", right_offset, alt.y + 0.10f,
+  info_label_side_.drawTextRightAligned("ALT", right_offset, alt.y + 0.15f,
                                         alt.label_r, alt.label_g, alt.label_b);
   
   char alt_str[32];
   snprintf(alt_str, sizeof(alt_str), "%.0f", alt.value);
-  info_font_.drawTextRightAligned(alt_str, right_offset, alt.y,
+  info_side_.drawTextRightAligned(alt_str, right_offset, alt.y,
                                   alt.value_r, alt.value_g, alt.value_b);
 }
 
