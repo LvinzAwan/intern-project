@@ -24,7 +24,7 @@ void HsiUiRenderer::renderCogGroup(const CourseGroup& course, float right_offset
   char cog_str[32];
 
   snprintf(cog_str, sizeof(cog_str), "COG %.0f°", course.cog_value);
-  info_font_.drawTextRightAligned(cog_str, right_offset, course.y_cog,
+  info_label_font_.drawTextRightAligned(cog_str, right_offset, course.y_cog,
                                   course.r, course.g, course.b);
 }
 
@@ -32,7 +32,7 @@ void HsiUiRenderer::renderGsGroup(const CourseGroup& course, float right_offset)
   char gs_str[32];
 
   snprintf(gs_str, sizeof(gs_str), "GS %.0f", course.gs_value);
-  info_font_.drawTextRightAligned(gs_str, right_offset, course.y_gs,
+  info_label_font_.drawTextRightAligned(gs_str, right_offset, course.y_gs,
                                   course.r, course.g, course.b);
 }
 

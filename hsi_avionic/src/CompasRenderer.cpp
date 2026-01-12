@@ -396,166 +396,203 @@ void CompasRenderer::drawBugTriangle(float bearing_deg, float heading_deg, float
   glDeleteVertexArrays(1, &VAO);
 }
 
-/**
- * Draw double-line waypoint arrow (green) pointing to destination
- * Double line indicates primary navigation waypoint
- */
 void CompasRenderer::drawWaypointArrowDouble(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
   float rotated_bearing = bearing_deg + heading_deg;
   float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
   
-  // Arrow start position (opposite direction)
   float start_radius = -0.50f;
   float sx = std::sin(angle_rad) * start_radius;
   float sy = std::cos(angle_rad) * start_radius;
   sx *= aspect_fix;
 
-  // Arrow end position (on compass circle)
   float end_radius = radius;
   float ex = std::sin(angle_rad) * end_radius;
   float ey = std::cos(angle_rad) * end_radius;
   ex *= aspect_fix;
 
-  // Direction vectors
   float outx = std::sin(angle_rad);
   float outy = std::cos(angle_rad);
 
   float tx = outy;
   float ty = -outx;
 
-  // Arrow head dimensions
   float arrow_head_length = 0.08f;
   float arrow_head_width = 0.04f;
 
-  // Arrow head base position
   float base_x = ex - outx * arrow_head_length * aspect_fix;
   float base_y = ey - outy * arrow_head_length;
 
-  // Double line separation
   float line_offset = 0.015f;
   
-  // Top line (from start to base)
   float sx1 = sx + tx * line_offset * aspect_fix;
   float sy1 = sy + ty * line_offset;
   float ex1 = base_x + tx * line_offset * aspect_fix;
   float ey1 = base_y + ty * line_offset;
   
-  // Bottom line (from start to base)
   float sx2 = sx - tx * line_offset * aspect_fix;
   float sy2 = sy - ty * line_offset;
   float ex2 = base_x - tx * line_offset * aspect_fix;
   float ey2 = base_y - ty * line_offset;
 
-  // Arrow tip
   float tip_x = ex;
   float tip_y = ey;
 
-  // Arrow head wings
   float left_x = base_x + tx * arrow_head_width * aspect_fix;
   float left_y = base_y + ty * arrow_head_width;
 
   float right_x = base_x - tx * arrow_head_width * aspect_fix;
   float right_y = base_y - ty * arrow_head_width;
 
-  // Construct vertices: double lines + arrow head
-  float vertices[] = {
+  // ─── DRAW DOUBLE LINES ───
+  float line_vertices[] = {
     sx1, sy1, ex1, ey1,
-    sx2, sy2, ex2, ey2,
-    base_x, base_y, left_x, left_y,
-    left_x, left_y, tip_x, tip_y,
-    tip_x, tip_y, right_x, right_y,
-    right_x, right_y, base_x, base_y
+    sx2, sy2, ex2, ey2
   };
 
-  GLuint VAO, VBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
+  GLuint line_VAO, line_VBO;
+  glGenVertexArrays(1, &line_VAO);
+  glGenBuffers(1, &line_VBO);
   
-  glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  glBindVertexArray(line_VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, line_VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(line_vertices), line_vertices, GL_STATIC_DRAW);
   
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
   glEnableVertexAttribArray(0);
 
   glLineWidth(3.5f);
-  glDrawArrays(GL_LINES, 0, 12);
+  glDrawArrays(GL_LINES, 0, 4);
   
-  glDeleteBuffers(1, &VBO);
-  glDeleteVertexArrays(1, &VAO);
+  glBindVertexArray(0);
+  glDeleteBuffers(1, &line_VBO);
+  glDeleteVertexArrays(1, &line_VAO);
+
+  // ─── DRAW ARROW HEAD FILLED ───
+  float arrow_vertices[] = {
+    // Left triangle (FILLED)
+    base_x, base_y,
+    left_x, left_y,
+    tip_x, tip_y,
+    
+    // Right triangle (FILLED)
+    base_x, base_y,
+    tip_x, tip_y,
+    right_x, right_y
+  };
+
+  GLuint arrow_VAO, arrow_VBO;
+  glGenVertexArrays(1, &arrow_VAO);
+  glGenBuffers(1, &arrow_VBO);
+  
+  glBindVertexArray(arrow_VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, arrow_VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(arrow_vertices), arrow_vertices, GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  shader_.use();
+  GLint loc = glGetUniformLocation(shader_.id(), "uColor");
+  glUniform3f(loc, 0.0f, 1.0f, 0.0f);  // Green
+
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+  
+  glBindVertexArray(0);
+  glDeleteBuffers(1, &arrow_VBO);
+  glDeleteVertexArrays(1, &arrow_VAO);
 }
 
-/**
- * Draw single-line waypoint arrow (yellow) pointing to destination
- * Single line indicates secondary navigation waypoint
- */
 void CompasRenderer::drawWaypointArrowSingle(float bearing_deg, float heading_deg, float aspect_fix, float radius) {
   float rotated_bearing = bearing_deg + heading_deg;
   float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
   
-  // Arrow start position (opposite direction)
   float start_radius = -0.50f;
   float sx = std::sin(angle_rad) * start_radius;
   float sy = std::cos(angle_rad) * start_radius;
   sx *= aspect_fix;
 
-  // Arrow end position (on compass circle)
   float end_radius = radius;
   float ex = std::sin(angle_rad) * end_radius;
   float ey = std::cos(angle_rad) * end_radius;
   ex *= aspect_fix;
 
-  // Direction vectors
   float outx = std::sin(angle_rad);
   float outy = std::cos(angle_rad);
 
   float tx = outy;
   float ty = -outx;
 
-  // Arrow head dimensions
   float arrow_head_length = 0.08f;
   float arrow_head_width = 0.04f;
 
-  // Arrow head base position
   float base_x = ex - outx * arrow_head_length * aspect_fix;
   float base_y = ey - outy * arrow_head_length;
 
-  // Arrow tip
   float tip_x = ex;
   float tip_y = ey;
 
-  // Arrow head wings
   float left_x = base_x + tx * arrow_head_width * aspect_fix;
   float left_y = base_y + ty * arrow_head_width;
 
   float right_x = base_x - tx * arrow_head_width * aspect_fix;
   float right_y = base_y - ty * arrow_head_width;
 
-  // Construct vertices: single line + arrow head
-  float vertices[] = {
-    sx, sy, base_x, base_y,
-    base_x, base_y, left_x, left_y,
-    left_x, left_y, tip_x, tip_y,
-    tip_x, tip_y, right_x, right_y,
-    right_x, right_y, base_x, base_y
+  // ─── DRAW SINGLE LINE ───
+  float line_vertices[] = {
+    sx, sy, base_x, base_y
   };
 
-  GLuint VAO, VBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
+  GLuint line_VAO, line_VBO;
+  glGenVertexArrays(1, &line_VAO);
+  glGenBuffers(1, &line_VBO);
   
-  glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  glBindVertexArray(line_VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, line_VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(line_vertices), line_vertices, GL_STATIC_DRAW);
   
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
   glEnableVertexAttribArray(0);
 
   glLineWidth(4.0f);
-  glDrawArrays(GL_LINES, 0, 10);
+  glDrawArrays(GL_LINES, 0, 2);
   
-  glDeleteBuffers(1, &VBO);
-  glDeleteVertexArrays(1, &VAO);
+  glBindVertexArray(0);
+  glDeleteBuffers(1, &line_VBO);
+  glDeleteVertexArrays(1, &line_VAO);
+
+  // ─── DRAW ARROW HEAD FILLED ───
+  float arrow_vertices[] = {
+    // Left triangle (FILLED)
+    base_x, base_y,
+    left_x, left_y,
+    tip_x, tip_y,
+    
+    // Right triangle (FILLED)
+    base_x, base_y,
+    tip_x, tip_y,
+    right_x, right_y
+  };
+
+  GLuint arrow_VAO, arrow_VBO;
+  glGenVertexArrays(1, &arrow_VAO);
+  glGenBuffers(1, &arrow_VBO);
+  
+  glBindVertexArray(arrow_VAO);
+  glBindBuffer(GL_ARRAY_BUFFER, arrow_VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(arrow_vertices), arrow_vertices, GL_STATIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  shader_.use();
+  GLint loc = glGetUniformLocation(shader_.id(), "uColor");
+  glUniform3f(loc, 1.0f, 1.0f, 0.0f);  // Yellow
+
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+  
+  glBindVertexArray(0);
+  glDeleteBuffers(1, &arrow_VBO);
+  glDeleteVertexArrays(1, &arrow_VAO);
 }
 
 /**
