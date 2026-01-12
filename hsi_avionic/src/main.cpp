@@ -35,9 +35,11 @@ namespace CircleConstants {
 }
 
 namespace PerpLineConstants {
-  const float LINE_LENGTH = 0.15f;      
+  const float LINE_LENGTH = 0.20f;      
   const float LINE_WIDTH = 6.0f;          
   const float LINE_SENSITIVITY = 0.008f;  
+  const float MAX_OFFSET_RIGHT = 0.45f;
+  const float MAX_OFFSET_LEFT = -0.45f;  
 }
 
 namespace DataConstants {
@@ -167,10 +169,27 @@ void handleInput(GLFWwindow* window, float& heading_deg, float& bug_heading,
 
   // Perpendicular line slider control with keyboard 1 and 2
   if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
-    compas.updatePerpLineOffset(-PerpLineConstants::LINE_SENSITIVITY);
+    float new_offset = compas.getPerpLineOffset() - PerpLineConstants::LINE_SENSITIVITY;
+    if (new_offset >= PerpLineConstants::MAX_OFFSET_LEFT) {
+      compas.updatePerpLineOffset(-PerpLineConstants::LINE_SENSITIVITY);
+    }
   }
   if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
-    compas.updatePerpLineOffset(PerpLineConstants::LINE_SENSITIVITY);
+    float new_offset = compas.getPerpLineOffset() + PerpLineConstants::LINE_SENSITIVITY;
+    if (new_offset <= PerpLineConstants::MAX_OFFSET_RIGHT) {
+      compas.updatePerpLineOffset(PerpLineConstants::LINE_SENSITIVITY);
+    }
+  }
+
+  // ===== TOGGLE TO/FROM FLAG DENGAN KEYBOARD 3 =====
+  static bool key3_pressed = false;
+  if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) {
+    if (!key3_pressed) {
+      compas.toggleToFromFlag();  // Toggle saat tombol pertama kali ditekan
+      key3_pressed = true;
+    }
+  } else {
+    key3_pressed = false;  // Reset saat tombol dilepas
   }
 
   // Exit application
@@ -491,6 +510,12 @@ int main() {
                                 CircleConstants::CIRCLE_SPACING,
                                 PerpLineConstants::LINE_LENGTH,
                                 PerpLineConstants::LINE_WIDTH);
+
+    // Draw TO/FROM flag (yellow triangle)
+    shader.use();
+    glUniform3f(glGetUniformLocation(shader.id(), "uColor"), R_YELLOW, G_YELLOW, B_YELLOW);
+    glUniform1f(glGetUniformLocation(shader.id(), "uAlpha"), 1.0f);
+    compas.drawToFromFlag(wp_left_bearing, heading_deg, kAspectFix, true, 0.50f);
 
     // Right waypoint arrow (double, green)
     shader.use();

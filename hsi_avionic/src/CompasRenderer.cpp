@@ -869,3 +869,103 @@ void CompasRenderer::drawAircraftSymbol(float aspect_fix) {
   glDeleteBuffers(1, &VBO);
   glDeleteVertexArrays(1, &VAO);
 }
+
+  /**
+   * Draw TO/FROM flag triangle
+   * @param bearing_deg Target bearing
+   * @param heading_deg Current heading
+   * @param aspect_fix Aspect ratio fix
+   * @param is_to If true draws TO (pointing same direction), if false draws FROM (180° reversed)
+   * @param radius Distance from center
+   */
+void CompasRenderer::drawToFromFlag(float bearing_deg, float heading_deg, float aspect_fix,
+                                     bool is_to, float radius) {
+  // ===== GUNAKAN STATE DARI CLASS =====
+  bool flag_is_to = is_to_flag_;  // Gunakan state dari member variable
+  
+  // ===== GUNAKAN FORMULA YANG SAMA DENGAN drawWaypointArrowSingle =====
+  float rotated_bearing = bearing_deg + heading_deg;
+  float angle_rad = rotated_bearing * 3.1415926535f / 180.0f;
+  
+  // Arrow direction vectors (SAMA SEPERTI ARROW)
+  float outx = std::sin(angle_rad);
+  float outy = std::cos(angle_rad);
+
+  float tx = outy;
+  float ty = -outx;
+
+  // ===== POSISI FLAG: SEBELAH KANAN BAWAH DEKAT PANGKAL ARROW =====
+  float end_radius = radius;
+  float ex = std::sin(angle_rad) * end_radius;
+  float ey = std::cos(angle_rad) * end_radius;
+  ex *= aspect_fix;
+
+  float arrow_head_length = 0.7f;
+  float base_x = ex - outx * arrow_head_length * aspect_fix;
+  float base_y = ey - outy * arrow_head_length;
+
+  // ===== FLAG CENTER =====
+  float flag_offset_right = 0.20f;
+  float flag_offset_down = 0.04f;
+  
+  float flag_center_x = base_x + tx * flag_offset_right * aspect_fix - outx * flag_offset_down * aspect_fix;
+  float flag_center_y = base_y + ty * flag_offset_right - outy * flag_offset_down;
+
+  // ===== FLAG DIRECTION: TO vs FROM (BERDASARKAN STATE) =====
+  float flag_angle_offset = flag_is_to ? 0.0f : 180.0f;
+  float flag_rotated_bearing = bearing_deg + heading_deg + flag_angle_offset;
+  if (flag_rotated_bearing >= 360.0f) flag_rotated_bearing -= 360.0f;
+  
+  float flag_angle_rad = flag_rotated_bearing * 3.1415926535f / 180.0f;
+  
+  float flag_outx = std::sin(flag_angle_rad);
+  float flag_outy = std::cos(flag_angle_rad);
+  
+  float flag_tx = flag_outy;
+  float flag_ty = -flag_outx;
+
+  // ===== TRIANGLE VERTICES (HANYA 2 GARIS LANCIP) =====
+  float tri_size = 0.10f;
+  
+  // Tip (pointing in flag direction)
+  float x1 = flag_center_x + flag_outx * tri_size * aspect_fix;
+  float y1 = flag_center_y + flag_outy * tri_size;
+  
+  // Base left
+  float x2 = flag_center_x + flag_tx * tri_size * 0.5f * aspect_fix;
+  float y2 = flag_center_y + flag_ty * tri_size * 0.5f;
+  
+  // Base right
+  float x3 = flag_center_x - flag_tx * tri_size * 0.5f * aspect_fix;
+  float y3 = flag_center_y - flag_ty * tri_size * 0.5f;
+  
+  // ===== HANYA DUA GARIS: TIP-LEFT dan TIP-RIGHT =====
+  std::vector<float> vertices = {
+    x1, y1,  // Tip
+    x2, y2,  // Base left
+    x1, y1,  // Tip (kembali ke tip)
+    x3, y3   // Base right
+  };
+  
+  GLuint vao, vbo;
+  glGenVertexArrays(1, &vao);
+  glGenBuffers(1, &vbo);
+  
+  glBindVertexArray(vao);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+  
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+
+  shader_.use();
+  GLint loc = glGetUniformLocation(shader_.id(), "uColor");
+  glUniform3f(loc, 1.0f, 1.0f, 0.0f);  // Yellow
+
+  // ===== RENDER DUA GARIS YANG MEMBENTUK LANCIP =====
+  glLineWidth(3.5f);
+  glDrawArrays(GL_LINES, 0, 4);  // 4 vertices = 2 garis
+  
+  glDeleteBuffers(1, &vbo);
+  glDeleteVertexArrays(1, &vao);
+}
