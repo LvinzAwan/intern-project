@@ -12,8 +12,12 @@ public:
                                       float aspect_fix,
                                       float heading_deg,
                                       float r, float g, float b);
-  
-  static void drawHeadingBox(float x, float y, float width, float height);
+
+  static void drawHeadingBox(float x, float y, float width, float height,
+                             float r, float g, float b);
+
+  static void drawIasAltFrame(float x, float y, float width, float height,
+                              float r, float g, float b, bool is_left);
 };
 
 #endif 

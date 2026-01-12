@@ -19,7 +19,6 @@ public:
   void renderWaypointLeft(const WaypointGroup& wp, float left_offset);
   void renderWaypointRight(const WaypointGroup& wp, float right_offset);
   void renderBugGroup(const BugGroup& bug);
-
 private:
   TtfTextRenderer& info_font_;
   TtfTextRenderer& info_label_font_;

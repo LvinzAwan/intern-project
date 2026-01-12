@@ -52,7 +52,7 @@ namespace DataConstants {
 
   // IAS (Indicated Air Speed) data
   const float IAS_VALUE = 181.0f;
-  const float IAS_Y = -0.10f;
+  const float IAS_Y = 0.0f;
 
   // Course data
   const float COURSE_COG = 45.0f;
@@ -62,7 +62,7 @@ namespace DataConstants {
 
   // Altitude data
   const float ALT_VALUE = -840.0f;
-  const float ALT_Y = -0.10f;
+  const float ALT_Y = 0.0f;
 
   // Left waypoint data
   const float WP_LEFT_DISTANCE = 861.9f;
@@ -83,6 +83,26 @@ namespace DataConstants {
   // Bug indicator data
   const float BUG_X = 0.0f;
   const float BUG_Y = -0.85f;
+
+  // IAS Frame configuration
+  const float IAS_FRAME_X = -0.95f; 
+  const float IAS_FRAME_Y = 0.00f;      
+  const float IAS_FRAME_WIDTH = 0.35f;  
+  const float IAS_FRAME_HEIGHT = 0.15f; 
+  const bool IAS_FRAME_IS_LEFT = true;   
+
+  // ALT Frame configuration
+  const float ALT_FRAME_X = 0.95f;     
+  const float ALT_FRAME_Y = 0.00f;     
+  const float ALT_FRAME_WIDTH = 0.35f;  
+  const float ALT_FRAME_HEIGHT = 0.15f;  
+  const bool ALT_FRAME_IS_LEFT = false;
+
+  // Heading Box configuration
+  const float HEADING_BOX_X = 0.0f;    
+  const float HEADING_BOX_Y = 0.82f;      
+  const float HEADING_BOX_WIDTH = 0.20f;  
+  const float HEADING_BOX_HEIGHT = 0.10f; 
 }
 
 static void framebuffer_size_callback(GLFWwindow*, int w, int h) {
@@ -184,8 +204,9 @@ void renderCompass(CompasRenderer& compas, TtfTextRenderer& ttf_cardinal,
 
 void renderHeadingDisplay(TtfTextRenderer& ttf_heading, TtfTextRenderer& ttf_label,
                           float heading_deg, Shader& shader) {
-  shader.use();
-  HsiRenderer::drawHeadingBox(0.0f, 0.82f, 0.18f, 0.10f);
+  // HsiRenderer::drawHeadingBox(DataConstants::HEADING_BOX_X, DataConstants::HEADING_BOX_Y,
+  //                               DataConstants::HEADING_BOX_WIDTH, DataConstants::HEADING_BOX_HEIGHT,
+  //                               R_YELLOW, G_YELLOW, B_YELLOW);
 
   char heading_str[16];
   float display_heading = 360.0f - (int)heading_deg;
@@ -258,13 +279,13 @@ int main() {
   const float font_sizes[] = {
     56.0f,  // fonts[0] - Cardinal (N, E, S, W)
     40.0f,  // fonts[1] - Numbers (30, 60, 120, ...)
-    52.0f,  // fonts[2] - Heading display (000)
-    38.0f,  // fonts[3] - Heading label (HDG, °M)
+    52.0f,  // fonts[2] - Heading display 
+    38.0f,  // fonts[3] - Heading label 
     26.0f,  // fonts[4] - Heading symbol
     54.0f,  // fonts[5] - Info font 
     48.0f,  // fonts[6] - Info label
     82.0f,  // fonts[7] - Waypoint name (EDAB, EDD1)
-    64.0f,  // fonts[8] - Waypoint bearing (347°, 324°)
+    64.0f,  // fonts[8] - Waypoint bearing
     42.0f,  // fonts[9] - Waypoint info
     84.0f,  // fonts[10] - Info font (IAS, ALT value)
     56.0f,  // fonts[11] - Info label (IAS, ALT label)
@@ -417,6 +438,14 @@ int main() {
     renderCompass(compas, ttf_cardinal, ttf_numbers, heading_deg);
     renderHeadingDisplay(ttf_heading, ttf_heading_label, heading_deg, shader);
 
+    HsiRenderer::drawIasAltFrame(DataConstants::IAS_FRAME_X, DataConstants::IAS_FRAME_Y, 
+                                 DataConstants::IAS_FRAME_WIDTH, DataConstants::IAS_FRAME_HEIGHT,
+                                 R_WHITE, G_WHITE, B_WHITE, DataConstants::IAS_FRAME_IS_LEFT);
+    
+    HsiRenderer::drawIasAltFrame(DataConstants::ALT_FRAME_X, DataConstants::ALT_FRAME_Y, 
+                                 DataConstants::ALT_FRAME_WIDTH, DataConstants::ALT_FRAME_HEIGHT,
+                                 R_WHITE, G_WHITE, B_WHITE, DataConstants::ALT_FRAME_IS_LEFT);
+    
     // Render side panel UI elements
     ui_renderer.renderWindGroup(wind, kLeftOffset);
     ui_renderer.renderGpsGroup(gps, kLeftOffset);
@@ -432,6 +461,13 @@ int main() {
 
     // Render navigation overlays on compass
     shader.use();
+
+    // Heading Box
+    glUniform3f(glGetUniformLocation(shader.id(), "uColor"), R_YELLOW, G_YELLOW, B_YELLOW);
+    glUniform1f(glGetUniformLocation(shader.id(), "uAlpha"), 1.0f);
+    HsiRenderer::drawHeadingBox(DataConstants::HEADING_BOX_X, DataConstants::HEADING_BOX_Y,
+                                DataConstants::HEADING_BOX_WIDTH, DataConstants::HEADING_BOX_HEIGHT,
+                                R_YELLOW, G_YELLOW, B_YELLOW);
     
     // Left waypoint arrow (single, yellow)
     glUniform3f(glGetUniformLocation(shader.id(), "uColor"), R_YELLOW, G_YELLOW, B_YELLOW);
@@ -467,11 +503,12 @@ int main() {
     glUniform3f(glGetUniformLocation(shader.id(), "uColor"), R_MAGENTA, G_MAGENTA, B_MAGENTA);
     glUniform1f(glGetUniformLocation(shader.id(), "uAlpha"), 1.0f);
     compas.drawBugTriangle(bug_heading, heading_deg, kAspectFix, 0.73f);
-
+    
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
+  
   glfwDestroyWindow(window);
   glfwTerminate();
   return 0;

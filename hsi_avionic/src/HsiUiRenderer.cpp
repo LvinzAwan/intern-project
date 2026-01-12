@@ -1,5 +1,7 @@
 #include "ui/HsiUiRenderer.hpp"
+#include <cmath>
 #include <cstdio>
+#include <vector>  
 
 HsiUiRenderer::HsiUiRenderer(TtfTextRenderer& info_font, TtfTextRenderer& info_label_font,
                              TtfTextRenderer& waypoint_name_font, TtfTextRenderer& waypoint_bearing_font,
@@ -34,23 +36,23 @@ void HsiUiRenderer::renderGsGroup(const CourseGroup& course, float right_offset)
                                   course.r, course.g, course.b);
 }
 
-void HsiUiRenderer::renderIasGroup(const IasGroup& ias, float left_offset) {
+void HsiUiRenderer::renderIasGroup(const IasGroup& ias, float left_offset) {  
   info_label_side_.drawTextLeftAligned("IAS", left_offset, ias.y + 0.15f,
                                        ias.label_r, ias.label_g, ias.label_b);
   
   char ias_str[32];
   snprintf(ias_str, sizeof(ias_str), "%.0f", ias.value);
-  info_side_.drawTextLeftAligned(ias_str, left_offset, ias.y,
+  info_side_.drawTextLeftAligned(ias_str, left_offset, ias.y - 0.05f,
                                  ias.value_r, ias.value_g, ias.value_b);
 }
 
-void HsiUiRenderer::renderAltGroup(const AltGroup& alt, float right_offset) {
+void HsiUiRenderer::renderAltGroup(const AltGroup& alt, float right_offset) {  
   info_label_side_.drawTextRightAligned("ALT", right_offset, alt.y + 0.15f,
                                         alt.label_r, alt.label_g, alt.label_b);
   
   char alt_str[32];
   snprintf(alt_str, sizeof(alt_str), "%.0f", alt.value);
-  info_side_.drawTextRightAligned(alt_str, right_offset, alt.y,
+  info_side_.drawTextRightAligned(alt_str, right_offset, alt.y - 0.05f,
                                   alt.value_r, alt.value_g, alt.value_b);
 }
 
@@ -124,8 +126,12 @@ void HsiUiRenderer::renderWaypointRight(const WaypointGroup& wp, float right_off
 
 void HsiUiRenderer::renderBugGroup(const BugGroup& bug) {
   char buffer[32];
-  snprintf(buffer, sizeof(buffer), "BUG %.0f °", bug.value);
-  
-  info_font_.drawTextCenteredNDC(buffer, bug.x, bug.y,  
+
+  snprintf(buffer, sizeof(buffer), "BUG");
+  info_font_.drawTextCenteredNDC(buffer, bug.x, bug.y - 0.05f,
+                                 bug.r, bug.g, bug.b);
+
+  snprintf(buffer, sizeof(buffer), "%.0f°", bug.value);
+  info_side_.drawTextCenteredNDC(buffer, bug.x, bug.y + 0.05f,  
                                  bug.r, bug.g, bug.b);
 }
