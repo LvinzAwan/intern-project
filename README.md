@@ -1,1 +1,1 @@
-# intern-project
+# This repository contains a project developed during an internship, focusing on the implementation of a graphical user interface (GUI) using OpenGL. The project is intended as a learning and experimentation platform for applying core computer graphics concepts in a real-time rendering context.
