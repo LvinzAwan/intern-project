@@ -3,13 +3,12 @@
 Horizontal Situation Indicator (HSI) is a real-time aircraft navigation display system built with OpenGL, featuring compass visualization, waypoint navigation, and dynamic heading indicators.
 
 ---
-<img width="795" height="638" alt="HSI Main Display" src="https://github.com/user-attachments/assets/ea9a313f-96e8-438e-9aa6-b38f2d5819ac" />
 
 ## 📷 Visual Documentation
 
 ```markdown
 #### Main Display
-![HSI Main Display](https://github.com/user-attachments/assets/beebc55a-b2da-4ad5-849b-aea758ec0121)
+<img width="795" height="638" alt="HSI Main Display" src="https://github.com/user-attachments/assets/ea9a313f-96e8-438e-9aa6-b38f2d5819ac" />
 
 ### Video Demonstrations
 [![Navigation Demo](assets/videos/thumbs/nav_demo.jpg)](assets/videos/01_navigation_demo.mp4)
