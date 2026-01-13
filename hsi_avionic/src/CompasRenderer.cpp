@@ -422,7 +422,7 @@ void CompasRenderer::drawWaypointArrowDouble(float bearing_deg, float heading_de
   float base_x = ex - outx * arrow_head_length * aspect_fix;
   float base_y = ey - outy * arrow_head_length;
 
-  float line_offset = 0.015f;
+  float line_offset = 0.017f;
   
   float sx1 = sx + tx * line_offset * aspect_fix;
   float sy1 = sy + ty * line_offset;
@@ -553,7 +553,7 @@ void CompasRenderer::drawWaypointArrowSingle(float bearing_deg, float heading_de
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
   glEnableVertexAttribArray(0);
 
-  glLineWidth(4.0f);
+  glLineWidth(8.0f);
   glDrawArrays(GL_LINES, 0, 2);
   
   glBindVertexArray(0);
@@ -963,7 +963,7 @@ void CompasRenderer::drawToFromFlag(float bearing_deg, float heading_deg, float 
   glUniform3f(loc, 1.0f, 1.0f, 0.0f);  // Yellow
 
   // ===== RENDER DUA GARIS YANG MEMBENTUK LANCIP =====
-  glLineWidth(3.5f);
+  glLineWidth(5.5f);
   glDrawArrays(GL_LINES, 0, 4);  // 4 vertices = 2 garis
   
   glDeleteBuffers(1, &vbo);
