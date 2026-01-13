@@ -29,4 +29,4 @@ private:
   TtfTextRenderer& info_label_side_;
 };
 
-#endif // HSI_UI_RENDERER_HPP
+#endif

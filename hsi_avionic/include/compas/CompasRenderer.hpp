@@ -31,7 +31,6 @@ public:
   void setPerpLineOffset(float offset);
   float getPerpLineOffset() const { return perp_line_offset_; }
   
-  // TO/FROM flag toggle
   void toggleToFromFlag() { is_to_flag_ = !is_to_flag_; }
   bool getToFromFlagState() const { return is_to_flag_; }
 
@@ -86,7 +85,6 @@ private:
   float tick_inner_r_10_ = 0.06f;
   float tick_inner_r_5_  = 0.04f;
 
-  // Perpendicular line parameters
   float perp_line_offset_ = 0.0f;
-  bool is_to_flag_ = true;  // true = TO, false = FROM
+  bool is_to_flag_ = true; 
 };

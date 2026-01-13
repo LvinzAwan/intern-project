@@ -26,11 +26,13 @@ target_include_directories(glad PUBLIC
 # Source files
 set(SOURCE_FILES
   src/main.cpp
-  src/Shader.cpp
-  src/CompasRenderer.cpp
-  src/TtfTextRenderer.cpp
-  src/HsiRenderer.cpp
-  src/HsiUiRenderer.cpp
+  src/gfx/Shader.cpp
+  src/compas/CompasRenderer.cpp
+  src/gfx/TtfTextRenderer.cpp
+  src/gfx/HsiRenderer.cpp
+  src/ui/HsiUiRenderer.cpp
+  src/core/InputHandler.cpp
+  src/core/RenderEngine.cpp
 )
 
 # Header files
@@ -41,6 +43,9 @@ set(HEADER_FILES
   include/compas/CompasRenderer.hpp
   include/ui/HsiUiRenderer.hpp
   include/data/HsiData.hpp
+  include/core/ApplicationState.hpp
+  include/core/InputHandler.hpp
+  include/core/RenderEngine.hpp
 )
 
 # ==================== COMPILER OPTIONS ====================

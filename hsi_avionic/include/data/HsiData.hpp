@@ -54,4 +54,4 @@ struct BugGroup {
   float r, g, b;
 };
 
-#endif // HSI_DATA_HPP
+#endif
