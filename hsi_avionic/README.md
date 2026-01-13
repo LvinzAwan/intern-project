@@ -1,10 +1,10 @@
 # HSI Avionic Display System
 
-Horizontal Situation Indicator (HSI) is a real-time aircraft navigation display system built with OpenGL, featuring compass visualization, waypoint navigation, and dynamic heading indicators.
+A Horizontal Situation Indicator (HSI) is an aircraft navigation display that combines heading information, course guidance, and lateral deviation into a single, intuitive instrument to help pilots understand their position and direction relative to a planned route. The HSI developed in this project is a software-based prototype that focuses on the graphical visualization of these navigation concepts using OpenGL, including a rotating compass, course indication, CDI, and TO/FROM logic. At this stage, the system functions purely as a GUI prototype and has not yet been integrated with real aircraft sensors, avionics hardware, or live navigation data.
 
 ---
 
-## 📷 Visual Documentation
+##  Visual Documentation
 
 ### HSI Main Display
 (<img width="795" height="638" alt="HSI Main Display" src="https://github.com/user-attachments/assets/ea9a313f-96e8-438e-9aa6-b38f2d5819ac" />)
@@ -29,39 +29,6 @@ https://github.com/user-attachments/assets/cced2431-4631-45ed-82a7-4efc48e0ec77
 | **1** | Move perpendicular line (left/offset) | -0.1 unit per press |
 | **2** | Move perpendicular line (right/offset) | +0.1 unit per press |
 | **3** | Switch to/from flag | N/A |
-
----
-
-## ✨ Key Features
-
-### Compass System
-- ✅ Full 360° compass ring with 5° tick marks
-- ✅ Cardinal direction markers (N, E, S, W) with triangular pointers
-- ✅ Real-time heading rotation synchronized with input
-- ✅ Smooth animation and rendering
-- ✅ Multiple tick levels (cardinal, major, medium, minor)
-
-### Navigation Display
-- ✅ Dual independent waypoint system (Left/Right)
-- ✅ Distance and bearing calculation for each waypoint
-- ✅ TO/FROM flag indicator for active navigation
-- ✅ Course tracking visualization
-- ✅ Perpendicular line offset for approach tracking
-- ✅ Double-arrow waypoint indicators
-
-### Heading & Course Information
-- ✅ Adjustable bug heading indicator
-- ✅ Current heading readout
-- ✅ Track and ground speed display
-- ✅ Wind direction and magnitude visualization
-- ✅ Real-time data refresh (100+ Hz)
-
-### User Interface
-- ✅ TTF font rendering for all text displays
-- ✅ Color-coded information (Yellow = active, White = standard, Magenta = bugs)
-- ✅ Responsive keyboard input handling
-- ✅ Configurable window size and aspect ratio
-- ✅ Hardware-accelerated OpenGL rendering
 
 ---
 
@@ -109,7 +76,7 @@ glxinfo | grep "OpenGL version"
 ```
 ---
 
-## 📦 Installation
+## Installation
 
 ### 1. Clone Repository
 
@@ -176,7 +143,7 @@ hsi_avionic/
 
 ---
 
-## 🔨 Build & Compilation
+##  Build & Compilation
 
 ### Standard Build Process
 
@@ -225,7 +192,7 @@ cmake --build .
 
 ---
 
-## 🚀 Running the Application
+##  Running the Application
 
 ### Start the Program
 
@@ -242,7 +209,7 @@ sudo make install
 hsi_avionic
 
 ```
-## 🏗️ Project Structure & Architecture
+##  Project Structure & Architecture
 
 ### System Architecture Diagram
 
@@ -281,7 +248,7 @@ hsi_avionic
             └──────────────────────┘
 ```
 
-### Core Modules
+### Modules
 
 | Module | File | Responsibility |
 |--------|------|-----------------|
