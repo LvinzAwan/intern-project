@@ -8,7 +8,7 @@ Horizontal Situation Indicator (HSI) is a real-time aircraft navigation display 
 
 ```markdown
 #### Main Display
-![HSI Main Display](assets/screenshots/01_main_display.png)
+![HSI Main Display](<img width="795" height="638" alt="HSI Main Display" src="https://github.com/user-attachments/assets/beebc55a-b2da-4ad5-849b-aea758ec0121" />)
 
 ### Video Demonstrations
 [![Navigation Demo](assets/videos/thumbs/nav_demo.jpg)](assets/videos/01_navigation_demo.mp4)
